@@ -1,5 +1,10 @@
 <?php
-define('BASE_URL', '/shagun-ladies-tailor/');
+require_once __DIR__ . '/bootstrap.php';
+$config = require __DIR__ . '/config.php';
+
+if (!defined('BASE_URL')) {
+    define('BASE_URL', app_base_path($config['app']['url']));
+}
 ?>
 
 <!DOCTYPE html>

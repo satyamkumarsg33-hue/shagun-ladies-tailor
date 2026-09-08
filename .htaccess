@@ -1,0 +1,4 @@
+# Prevent environment files from being served if this directory is a web root.
+<FilesMatch "^\.env">
+    Require all denied
+</FilesMatch>

@@ -1,30 +1,26 @@
-<?php include 'includes/header.php'; ?>
+<?php
+require_once __DIR__ . '/includes/demo-data.php';
+include __DIR__ . '/includes/header.php';
+$categories = standard_stitching_categories();
+?>
 
-<section class="standard-page">
-    <div class="standard-page-hero">
-        <p class="standard-page-tag">Shagun Ladies Tailor</p>
-        <h1>Standard Stitching</h1>
-        <p class="standard-page-subtitle">Everyday fits with reliable tailoring, elegant finishing, and delivery you can plan around.</p>
-        <a href="contact.php" class="btn">Book Standard Stitching</a>
-    </div>
-
-    <div class="standard-page-content">
-        <div class="standard-page-copy">
-            <h2>What You Get</h2>
-            <p>Our standard stitching service is ideal for daily wear, festive outfits, and practical custom tailoring that balances clean finishing with dependable turnaround time.</p>
-
-            <div class="standard-feature-list">
-                <div class="standard-feature-item">Blouse, kurti, suit, and lehenga stitching</div>
-                <div class="standard-feature-item">Neat finishing with fit-focused measurements</div>
-                <div class="standard-feature-item">Alteration support for better day-to-day comfort</div>
-                <div class="standard-feature-item">Estimated delivery in 5-7 days</div>
-            </div>
+<main class="service-landing">
+    <section class="service-landing-hero">
+        <div><p class="demo-eyebrow">Shagun Ladies Tailor</p><h1>Standard Stitching</h1><p>Everyday tailoring with dependable timelines, careful fitting, and elegant finishing.</p><span class="service-landing-note">Most standard orders are ready in 5–7 days.</span></div>
+        <img src="assets/images/design 2.jpg" alt="Elegant standard stitching design">
+    </section>
+    <section class="service-category-section">
+        <div class="section-heading"><p class="demo-eyebrow">Choose your service</p><h2>What would you like stitched?</h2><p>Start with a garment type. You will be able to choose details for each individual piece.</p></div>
+        <div class="service-category-grid">
+            <?php foreach ($categories as $category): ?>
+                <?php if ($category['available']): ?>
+                    <a class="service-category-card" href="<?php echo htmlspecialchars($category['href']); ?>"><img src="<?php echo htmlspecialchars($category['image']); ?>" alt="<?php echo htmlspecialchars($category['name']); ?>"><div><h3><?php echo htmlspecialchars($category['name']); ?></h3><p><?php echo htmlspecialchars($category['description']); ?></p><span>Choose style <b>→</b></span></div></a>
+                <?php else: ?>
+                    <article class="service-category-card is-coming" aria-label="<?php echo htmlspecialchars($category['name']); ?> coming next"><img src="<?php echo htmlspecialchars($category['image']); ?>" alt="<?php echo htmlspecialchars($category['name']); ?>"><div><p class="coming-label">Demo coming next</p><h3><?php echo htmlspecialchars($category['name']); ?></h3><p><?php echo htmlspecialchars($category['description']); ?></p></div></article>
+                <?php endif; ?>
+            <?php endforeach; ?>
         </div>
+    </section>
+</main>
 
-        <div class="standard-page-visual">
-            <img src="assets/images/design 2.jpg" alt="Standard stitching design showcase">
-        </div>
-    </div>
-</section>
-
-<?php include 'includes/footer.php'; ?>
+<?php include __DIR__ . '/includes/footer.php'; ?>

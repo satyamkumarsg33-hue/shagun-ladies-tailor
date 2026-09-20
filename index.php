@@ -1,30 +1,45 @@
-<?php include 'includes/header.php'; ?>
+<?php 
+include 'includes/header.php'; 
+$luxe_entry_url = is_user_logged_in() ? 'luxe-stitching.php' : 'login.php?redirect=luxe-stitching.php';
+?>
 
 <!-- HERO -->
 <div class="hero-section">
 
     <!-- LEFT SIDE -->
-    <div class="hero-left">
-        <div class="hero-overlay">
-            <div class="hero-copy-desktop">
-                <p class="tagline">BESPOKE ELEGANCE</p>
-                <h1>Exquisite Tailoring for the Modern Woman – Crafted to Perfection.</h1>
-                <p>Crafted just for you.</p>
+  <div class="hero-left">
+    <div class="hero-overlay">
 
-                <a href="contact.php" class="btn">Book a Consultation</a>
-            </div>
+        <div class="hero-copy-desktop">
+            <p class="tagline">SHAGUN LADIES TAILOR</p>
 
-            <div class="hero-copy-mobile">
-                <p class="mobile-hero-brand">Shagun Ladies Tailor</p>
-                <h1 class="mobile-hero-title">Custom Tailoring</h1>
+            <h1>Wear Your Story.</h1>
 
-                <div class="mobile-hero-tags">
-                    <span>Doorstep</span>
-                    <span>Pickup and Delivery</span>
-                </div>
-            </div>
+            <p>
+                Thoughtfully tailored outfits, crafted around
+                your style, your fit, and your story.
+            </p>
+
+            <a href="designs.php" class="btn">Explore Collection →</a>
         </div>
+
+        <div class="hero-copy-mobile">
+            <p class="mobile-hero-brand">SHAGUN LADIES TAILOR</p>
+
+            <h1 class="mobile-hero-title">Wear<br>Your Story.</h1>
+
+            <p class="mobile-hero-text">
+                Thoughtfully tailored outfits for moments
+                that matter.
+            </p>
+
+            <a href="designs.php" class="mobile-hero-button">
+                Explore Collection →
+            </a>
+        </div>
+
     </div>
+</div>
 
     <!-- RIGHT SIDE -->
     <div class="hero-right">
@@ -87,6 +102,462 @@
     </div>
 
 </div>
+<!-- ================================
+     PREMIUM MOBILE HOMEPAGE
+     ================================ -->
+
+<section class="premium-mobile-home">
+
+    <!-- 1. OUR TAILORING SERVICES -->
+    <section class="pm-section pm-services">
+        <div class="pm-heading">
+            <p class="pm-eyebrow">WHAT WE DO</p>
+            <h2>Our Tailoring Services</h2>
+            <p>Choose the type of stitching that suits your needs.</p>
+        </div>
+
+        <div class="pm-service-list">
+
+            <a href="standard-stitching.php" class="pm-service-card">
+                <img src="assets/images/design 1.jpg"
+                     alt="Standard stitching">
+                <div class="pm-service-content">
+                    <span class="pm-service-number">01</span>
+                    <h3>Standard Stitching</h3>
+                    <p>Everyday elegance with a comfortable, precise fit.</p>
+                    <span class="pm-arrow">→</span>
+                </div>
+            </a>
+
+            <a href="<?php echo htmlspecialchars($luxe_entry_url, ENT_QUOTES, 'UTF-8'); ?>" class="pm-service-card">
+                <img src="assets/images/luxe-1.jpg"
+                     alt="Luxe stitching">
+                <div class="pm-service-content">
+                    <span class="pm-service-number">02</span>
+                    <h3>Luxe Stitching</h3>
+                    <p>Premium finishing for weddings and special occasions.</p>
+                    <span class="pm-arrow">→</span>
+                </div>
+            </a>
+
+            <a href="contact.php" class="pm-service-card">
+                <img src="assets/images/luxe-4.jpg"
+                     alt="Hand work">
+                <div class="pm-service-content">
+                    <span class="pm-service-number">03</span>
+                    <h3>Hand Work</h3>
+                    <p>Intricate handcrafted detailing for a distinctive look.</p>
+                    <span class="pm-arrow">→</span>
+                </div>
+            </a>
+
+            <a href="contact.php" class="pm-service-card">
+                <img src="assets/images/luxe-2.jpg"
+                     alt="Machine work">
+                <div class="pm-service-content">
+                    <span class="pm-service-number">04</span>
+                    <h3>Machine Work</h3>
+                    <p>Precision designs with a clean and polished finish.</p>
+                    <span class="pm-arrow">→</span>
+                </div>
+            </a>
+
+        </div>
+    </section>
+
+
+    <!-- 2. SHOP BY OCCASION -->
+    <section class="pm-section pm-occasions">
+
+        <div class="pm-heading pm-heading-row">
+            <div>
+                <p class="pm-eyebrow">FIND YOUR STYLE</p>
+                <h2>Shop by Occasion</h2>
+            </div>
+
+            <a href="designs.php" class="pm-view-all">View All →</a>
+        </div>
+
+        <div class="pm-occasion-grid">
+
+            <a href="designs.php" class="pm-occasion-card">
+                <img src="assets/images/luxe-3.jpg" alt="Wedding outfits">
+                <span>Weddings</span>
+            </a>
+
+            <a href="designs.php" class="pm-occasion-card">
+                <img src="assets/images/luxe-2.jpg" alt="Festive outfits">
+                <span>Festivals</span>
+            </a>
+
+            <a href="designs.php" class="pm-occasion-card">
+                <img src="assets/images/lehenga.jpg" alt="Family occasions">
+                <span>Family Events</span>
+            </a>
+
+            <a href="designs.php" class="pm-occasion-card">
+                <img src="assets/images/kurti.jpg" alt="Daily wear">
+                <span>Daily Wear</span>
+            </a>
+
+        </div>
+
+    </section>
+
+
+    <!-- 3. YOUR IDEAS. OUR EXPERTISE. -->
+    <section class="pm-section pm-expertise">
+
+        <div class="pm-expertise-card">
+
+            <p class="pm-eyebrow">ABOUT SHAGUN</p>
+
+            <h2>Your Ideas.<br>Our Expertise.</h2>
+
+            <p>
+                At Shagun Ladies Tailor, we create outfits that fit beautifully,
+                feel comfortable, and match your unique style. From everyday wear
+                to festive and bridal looks, every piece is tailored with care,
+                precision and attention to detail.
+            </p>
+
+            <div class="pm-trust-points">
+
+                <div>
+                    <span>◇</span>
+                    <strong>Quality<br>Craftsmanship</strong>
+                </div>
+
+                <div>
+                    <span>◌</span>
+                    <strong>Perfect<br>Fit</strong>
+                </div>
+
+                <div>
+                    <span>♡</span>
+                    <strong>Personalized<br>Service</strong>
+                </div>
+
+            </div>
+
+        </div>
+
+    </section>
+
+
+    <!-- 4. ADMIN BANNER #1 -->
+    <section class="pm-banner-card">
+
+        <img src="assets/images/luxe-3.jpg"
+             alt="Festive tailoring at Shagun Ladies Tailor">
+
+        <div class="pm-banner-overlay">
+            <p>SEASONAL EDIT</p>
+            <h2>Festive Looks,<br>Perfectly Tailored.</h2>
+            <span>Explore Now →</span>
+        </div>
+
+    </section>
+
+
+    <!-- 5. FEATURED STYLES -->
+    <section class="pm-section pm-featured">
+
+        <div class="pm-heading pm-heading-row">
+            <div>
+                <p class="pm-eyebrow">STYLE INSPIRATION</p>
+                <h2>Featured Styles</h2>
+            </div>
+
+            <a href="designs.php" class="pm-view-all">View All →</a>
+        </div>
+
+        <div class="pm-featured-grid">
+
+            <a href="designs.php">
+                <img src="assets/images/blouse.jpg" alt="Blouse styles">
+                <span>Blouses</span>
+            </a>
+
+            <a href="designs.php">
+                <img src="assets/images/kurti.jpg" alt="Kurti styles">
+                <span>Kurtis</span>
+            </a>
+
+            <a href="designs.php">
+                <img src="assets/images/lehenga.jpg" alt="Lehenga styles">
+                <span>Lehengas</span>
+            </a>
+
+            <a href="designs.php">
+                <img src="assets/images/design 2.jpg" alt="Saree blouse styles">
+                <span>Sarees</span>
+            </a>
+
+        </div>
+
+    </section>
+
+
+    <!-- 6. GALLERY PREVIEW -->
+    <section class="pm-section pm-gallery-preview">
+
+        <div class="pm-heading pm-heading-row">
+            <div>
+                <p class="pm-eyebrow">GALLERY</p>
+                <h2>A Glimpse of Our Work</h2>
+                <p>Real outfits. Real craftsmanship.</p>
+            </div>
+
+            <a href="designs.php" class="pm-view-all">View All →</a>
+        </div>
+
+        <div class="pm-gallery-layout">
+
+            <a href="designs.php" class="pm-gallery-large">
+                <img src="assets/images/blouse-work.jpg"
+                     alt="Blouse design work">
+                <div>
+                    <strong>Blouse Designs</strong>
+                    <span>Elegant & Timeless</span>
+                </div>
+            </a>
+
+            <div class="pm-gallery-side">
+
+                <a href="designs.php">
+                    <img src="assets/images/kurti.jpg"
+                         alt="Kurti designs">
+                    <div>
+                        <strong>Kurti Designs</strong>
+                        <span>Everyday Elegance</span>
+                    </div>
+                </a>
+
+                <a href="designs.php">
+                    <img src="assets/images/lehenga.jpg"
+                         alt="Lehenga designs">
+                    <div>
+                        <strong>Lehenga Designs</strong>
+                        <span>Made for Special Moments</span>
+                    </div>
+                </a>
+
+            </div>
+
+        </div>
+
+    </section>
+
+
+    <!-- 7. CUSTOM TAILORING MADE SIMPLE -->
+    <section class="pm-section pm-process">
+
+        <div class="pm-heading">
+            <p class="pm-eyebrow">HOW IT WORKS</p>
+            <h2>Custom Tailoring Made Simple</h2>
+            <p>A smooth and simple process, from your idea to your perfect outfit.</p>
+        </div>
+
+        <div class="pm-process-list">
+
+            <div class="pm-process-item">
+                <span>01</span>
+                <div>
+                    <h3>Choose Your Style</h3>
+                    <p>Browse our styles or share your own idea.</p>
+                </div>
+            </div>
+
+            <div class="pm-process-item">
+                <span>02</span>
+                <div>
+                    <h3>Customize</h3>
+                    <p>Select fabric, design and finishing details.</p>
+                </div>
+            </div>
+
+            <div class="pm-process-item">
+                <span>03</span>
+                <div>
+                    <h3>Share Measurements</h3>
+                    <p>Use your reference garment or visit our shop.</p>
+                </div>
+            </div>
+
+            <div class="pm-process-item">
+                <span>04</span>
+                <div>
+                    <h3>We Stitch</h3>
+                    <p>We create your outfit with care and precision.</p>
+                </div>
+            </div>
+
+        </div>
+
+    </section>
+
+
+    <!-- 8. WHY CHOOSE US -->
+    <section class="pm-section pm-why">
+
+        <div class="pm-heading">
+            <p class="pm-eyebrow">THE SHAGUN DIFFERENCE</p>
+            <h2>Why Choose Shagun Ladies Tailor?</h2>
+        </div>
+
+        <div class="pm-why-grid">
+
+            <div>
+                <span>✂</span>
+                <h3>Skilled Craftsmanship</h3>
+                <p>Experienced tailoring with attention to every detail.</p>
+            </div>
+
+            <div>
+                <span>◌</span>
+                <h3>Custom Fit</h3>
+                <p>Designed and stitched around your measurements.</p>
+            </div>
+
+            <div>
+                <span>◇</span>
+                <h3>Attention to Detail</h3>
+                <p>Clean finishing that makes every outfit feel special.</p>
+            </div>
+
+            <div>
+                <span>♡</span>
+                <h3>Personal Service</h3>
+                <p>We listen to your ideas and help you choose confidently.</p>
+            </div>
+
+        </div>
+
+    </section>
+
+
+    <!-- 9. ADMIN BANNER #2 -->
+    <section class="pm-banner-card">
+
+        <img src="assets/images/luxe-1.jpg"
+             alt="Premium blouse tailoring">
+
+        <div class="pm-banner-overlay">
+            <p>SHAGUN LUXE</p>
+            <h2>Beautiful Details<br>For Special Moments.</h2>
+            <span>Explore Luxe →</span>
+        </div>
+
+    </section>
+
+
+    <!-- 10. CUSTOMER STORIES -->
+    <section class="pm-section pm-stories">
+
+        <div class="pm-heading">
+            <p class="pm-eyebrow">CUSTOMER LOVE</p>
+            <h2>Real Women.<br>Beautiful Stories.</h2>
+            <p>Outfits tailored for moments that matter.</p>
+        </div>
+
+        <div class="pm-story-images">
+
+            <img src="assets/images/blouse-work.jpg"
+                 alt="Customer blouse styling">
+
+            <img src="assets/images/kurti.jpg"
+                 alt="Customer kurti styling">
+
+            <img src="assets/images/lehenga.jpg"
+                 alt="Customer festive styling">
+
+        </div>
+
+        <div class="pm-testimonial">
+            <p>
+                “Perfect fitting and beautiful finishing. I loved how my
+                blouse turned out.”
+            </p>
+            <strong>— Our Customer</strong>
+        </div>
+
+    </section>
+
+
+    <!-- 11. VISIT OUR BOUTIQUE -->
+    <section class="pm-section pm-location">
+
+        <div class="pm-heading">
+            <p class="pm-eyebrow">VISIT US</p>
+            <h2>Visit Our Boutique</h2>
+            <p>Come meet us and discuss your next outfit.</p>
+        </div>
+
+        <div class="pm-map-card">
+
+            <iframe
+                src="https://maps.google.com/maps?q=Shagun%20Ladies%20Tailor%20Bengaluru&z=15&output=embed"
+                title="Shagun Ladies Tailor location map"
+                loading="lazy"
+                referrerpolicy="no-referrer-when-downgrade">
+            </iframe>
+
+            <div class="pm-location-info">
+
+                <div>
+                    <strong>Shagun Ladies Tailor</strong>
+                    <span>
+                        Velankanni Road, Electronic City Phase 1,
+                        Bengaluru 560100
+                    </span>
+                </div>
+
+                <div>
+                    <strong>Opening Hours</strong>
+                    <span>Mon – Sat · 10:00 AM – 9:30 PM</span>
+                    <span>Sunday · 10:00 AM – 9:00 PM</span>
+                </div>
+
+            </div>
+
+            <a href="https://maps.app.goo.gl/BvWMT8yppH7AHw2h8"
+               target="_blank"
+               rel="noopener noreferrer"
+               class="pm-directions">
+                Get Directions →
+            </a>
+
+        </div>
+
+    </section>
+
+
+    <!-- 12. READY TO BEGIN -->
+    <section class="pm-section pm-final-cta">
+
+        <p class="pm-eyebrow">READY WHEN YOU ARE</p>
+
+        <h2>Let's Create Something Beautiful.</h2>
+
+        <p>
+            Whether it's a simple alteration or a custom design,
+            we're here to help.
+        </p>
+
+        <a href="standard-stitching.php" class="pm-main-button">
+            Start Customizing →
+        </a>
+
+        <a href="contact.php" class="pm-outline-button">
+            Contact Us
+        </a>
+
+    </section>
+
+</section>
+
+<!-- END PREMIUM MOBILE HOMEPAGE -->
 
 <section class="mobile-timeline-section">
     <div class="mobile-timeline-header">
@@ -132,7 +603,7 @@
             </div>
         </a>
 
-        <a href="designs.php" class="mobile-timeline-card mobile-timeline-card-luxe">
+        <a href="<?php echo htmlspecialchars($luxe_entry_url, ENT_QUOTES, 'UTF-8'); ?>" class="mobile-timeline-card mobile-timeline-card-luxe">
             <div class="mobile-timeline-figure">
                 <img src="assets/images/luxe-1.jpg" alt="Luxe stitching design for women and kids">
             </div>
@@ -268,7 +739,7 @@
                 </div>
             </section>
 
-            <a href="designs.php" class="luxe-stitching-card">
+            <a href="<?php echo htmlspecialchars($luxe_entry_url, ENT_QUOTES, 'UTF-8'); ?>" class="luxe-stitching-card">
                 <div class="standard-stitching-header">
                     <h2>Luxe Stitching</h2>
                     <p>Premium luxury tailoring!</p>

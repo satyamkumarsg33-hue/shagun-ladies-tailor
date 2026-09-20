@@ -1,6 +1,10 @@
 <?php
+require_once __DIR__ . '/cart.php';
 require_once __DIR__ . '/bootstrap.php';
+require_once __DIR__ . '/auth.php';
 $config = require __DIR__ . '/config.php';
+demo_cart_bootstrap();
+demo_cart_touch();
 
 if (!defined('BASE_URL')) {
     define('BASE_URL', app_base_path($config['app']['url']));
@@ -19,7 +23,7 @@ if (!defined('BASE_URL')) {
     <meta name="keywords" content="ladies tailor near me, blouse stitching, kurti stitching, lehenga stitching">
 
     <!-- CSS -->
-   <link rel="stylesheet" href="<?php echo BASE_URL; ?>assets/css/style.css?v=20260820-6">
+   <link rel="stylesheet" href="<?php echo BASE_URL; ?>assets/css/style.css?v=20260908-3">
 </head>
 <body>
 

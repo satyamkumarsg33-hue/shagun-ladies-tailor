@@ -12,7 +12,8 @@ return [
     ],
     'database' => [
         'host' => app_env('DB_HOST', '127.0.0.1'),
-        'name' => app_env('DB_NAME', ''),
+        'port' => (int) app_env('DB_PORT', '3306'),
+        'name' => app_env('DB_NAME', 'shagun_ladies_tailor'),
         'user' => app_env('DB_USER', 'root'),
         'password' => app_env('DB_PASSWORD', ''),
     ],

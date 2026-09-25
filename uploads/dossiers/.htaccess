@@ -1,0 +1,11 @@
+# Deny direct HTTP access to generated dossiers
+# Files can only be downloaded/streamed via authorized PHP routes
+Order Deny,Allow
+Deny from all
+
+<FilesMatch "\.(php|phtml|php3|php4|php5|php7|phps|cgi|pl|exe)$">
+    Order Deny,Allow
+    Deny from all
+</FilesMatch>
+php_flag engine off
+Options -ExecCGI

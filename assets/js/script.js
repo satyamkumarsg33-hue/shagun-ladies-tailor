@@ -1770,9 +1770,17 @@ document.addEventListener('DOMContentLoaded', function () {
                 }
             });
 
+            // Clear needed notice and highlight
+            personCard.classList.remove('is-needed');
+            const neededNotice = personCard.querySelector('.luxe-measurement-needed-notice');
+            if (neededNotice) {
+                neededNotice.style.display = 'none';
+            }
+
             // Update status badge
             if (statusBadge) {
                 statusBadge.classList.remove('is-unselected');
+                statusBadge.classList.remove('is-needed');
                 statusBadge.classList.add('is-selected');
 
                 const desktopText = statusBadge.querySelector('.badge-text-desktop');

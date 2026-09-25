@@ -25,6 +25,28 @@ if (session_status() === PHP_SESSION_NONE) {
 }
 
 $luxe = $_SESSION['luxe_wedding'] ?? [];
+
+// If the customer has Standard items in the cart and NO active Luxe draft,
+// route them to the Standard Stitching checkout flow.
+$hasActiveLuxe = function_exists('has_active_luxe_draft') ? has_active_luxe_draft() : false;
+$hasStandardInCart = function_exists('demo_cart_items') && !empty(demo_cart_items());
+
+if (!$hasActiveLuxe && $hasStandardInCart) {
+    header('Location: checkout.php');
+    exit;
+}
+
+// If session holds an already completed order, redirect to orders page
+if (function_exists('is_luxe_order_completed') && is_luxe_order_completed($luxe)) {
+    $completedRef = $luxe['order_ref'] ?? ($luxe['payment']['order_ref'] ?? '');
+    if (!empty($completedRef)) {
+        header('Location: orders.php?ref=' . urlencode($completedRef));
+    } else {
+        header('Location: luxe-stitching.php');
+    }
+    exit;
+}
+
 $people = $luxe['people'] ?? [];
 
 // Demo mode fallback when accessed directly
@@ -149,12 +171,12 @@ $completedGarments = 0;
 $allMeasurementsSelected = true;
 
 foreach ($people as $p) {
-    $mMethod = $p['measurement_method'] ?? null;
-    if (empty($mMethod) || !in_array($mMethod, ['reference_blouse', 'visit_shop'], true)) {
-        $allMeasurementsSelected = false;
-    }
-
-    if (!isset($p['garments']) || !is_array($p['garments'])) {
+    if (!isset($p['garments']) || !is_array($p['garments']) || empty($p['garments'])) {
+        $totalGarments++;
+        $pMethod = $p['measurement_method'] ?? null;
+        if (empty($pMethod) || !in_array($pMethod, ['reference_blouse', 'visit_shop'], true)) {
+            $allMeasurementsSelected = false;
+        }
         continue;
     }
 
@@ -180,6 +202,35 @@ foreach ($people as $p) {
         if ($status === 'completed' || ($isCust && $isW)) {
             $completedGarments++;
         }
+
+        // Each individual physical garment must have a valid measurement method
+        $gMethod = is_array($g) ? ($g['measurement_method'] ?? ($p['measurement_method'] ?? null)) : null;
+        if (empty($gMethod) || !in_array($gMethod, ['reference_blouse', 'visit_shop'], true)) {
+            $allMeasurementsSelected = false;
+        }
+    }
+}
+
+// -------------------------------------------------------------
+// PRICING CALCULATION (UNIFIED CART AWARE) & CHECKPOINT
+// -------------------------------------------------------------
+$unified = get_unified_basket();
+$hasStandard = $unified['has_standard'];
+$hasLuxe = $unified['has_luxe'];
+$isCombined = $unified['is_combined'];
+$categoryBreakdown = $unified['category_breakdown'] ?? [];
+$categoryTotals = $unified['category_totals'] ?? [];
+$standardItems = $unified['standard_items'];
+
+// Check standard items measurement completeness
+if ($hasStandard && !empty($standardItems)) {
+    foreach ($standardItems as $sItem) {
+        $totalGarments++;
+        $completedGarments++;
+        $sMethod = $sItem['measurement_method'] ?? ($_SESSION['standard_order']['measurement_method'] ?? null);
+        if (empty($sMethod) || !in_array($sMethod, ['reference_blouse', 'visit_shop'], true)) {
+            $allMeasurementsSelected = false;
+        }
     }
 }
 
@@ -193,21 +244,10 @@ if (!$demoMode) {
 
     // If any measurement method is missing, redirect to measurements
     if (!$allMeasurementsSelected) {
-        header('Location: measurements.php');
+        header('Location: measurements.php?missing=1');
         exit;
     }
 }
-
-// -------------------------------------------------------------
-// PRICING CALCULATION (UNIFIED CART AWARE)
-// -------------------------------------------------------------
-$unified = get_unified_basket();
-$hasStandard = $unified['has_standard'];
-$hasLuxe = $unified['has_luxe'];
-$isCombined = $unified['is_combined'];
-$categoryBreakdown = $unified['category_breakdown'] ?? [];
-$categoryTotals = $unified['category_totals'] ?? [];
-$standardItems = $unified['standard_items'];
 $standardItemCount = $unified['standard_item_count'];
 $luxeGarmentCount = $unified['luxe_garment_count'];
 $luxePeopleCount = count($people);
@@ -285,9 +325,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             'occasion' => !empty($luxe['occasion']) ? ucfirst($luxe['occasion']) : 'Wedding',
             'updated_at' => time()
         ];
-        if ($hasStandard) {
-            $_SESSION['standard_order']['advance_payment'] = $_SESSION['luxe_wedding']['advance_payment'];
-        }
         $orderConfirmed = true;
         header('Location: payment.php');
         exit;
@@ -398,6 +435,23 @@ include __DIR__ . '/includes/header.php';
                                     <span>✎</span> Edit Cart
                                 </a>
                             </div>
+                            <?php
+                            $stdPrimaryMethod = $standardItems[0]['measurement_method'] ?? ($_SESSION['standard_order']['measurement_method'] ?? null);
+                            ?>
+                            <?php if (!empty($stdPrimaryMethod)): ?>
+                                <div class="luxe-review-method-badge">
+                                    <div class="luxe-method-badge-info">
+                                        <span class="luxe-method-badge-icon"><?php echo $stdPrimaryMethod === 'visit_shop' ? '🏪' : '📦'; ?></span>
+                                        <div>
+                                            <span class="luxe-method-badge-label">Measurement</span>
+                                            <strong class="luxe-method-badge-value"><?php echo $stdPrimaryMethod === 'visit_shop' ? 'Visit Shop' : 'Reference Blouse'; ?></strong>
+                                        </div>
+                                    </div>
+                                    <a href="measurements.php" class="luxe-review-edit-btn">
+                                        <span>✎</span> Edit
+                                    </a>
+                                </div>
+                            <?php endif; ?>
                         </div>
 
                         <p class="luxe-review-method-note">
@@ -419,6 +473,12 @@ include __DIR__ . '/includes/header.php';
                                         <div class="luxe-review-garment-title-row">
                                             <strong><?php echo htmlspecialchars($stdItem['item_label']); ?></strong>
                                             <span class="luxe-review-style-tag"><?php echo htmlspecialchars($stdItem['style_name']); ?></span>
+                                            <?php if (!empty($stdItem['measurement_method'])): ?>
+                                                <span class="luxe-tag-badge measurement" style="display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 600; background: #eaf6ed; color: #257037; border: 1px solid #cbe9d2;">
+                                                    <span><?php echo $stdItem['measurement_method'] === 'visit_shop' ? '🏪' : '📦'; ?></span>
+                                                    <span><?php echo $stdItem['measurement_method'] === 'visit_shop' ? 'Visit Shop' : 'Reference Blouse'; ?></span>
+                                                </span>
+                                            <?php endif; ?>
                                         </div>
 
                                         <?php if (!empty($stdItem['customization_choices'])): ?>

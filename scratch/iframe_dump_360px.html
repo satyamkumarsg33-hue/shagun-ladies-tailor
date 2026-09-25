@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html><head>
+<meta charset="utf-8">
+<style>
+  body { margin: 0; padding: 0; background: #222; }
+  iframe { border: none; width: 360px; height: 852px; display: block; }
+</style>
+</head>
+<body>
+<iframe id="frame" src="rendered_review_test.html"></iframe>
+<script>
+const frame = document.getElementById('frame');
+frame.onload = function() {
+    setTimeout(function() {
+        const doc = frame.contentDocument;
+        const win = frame.contentWindow;
+        
+        // Find all elements overflowing viewport
+        const overflowing = [];
+        doc.querySelectorAll('*').forEach(el => {
+            const r = el.getBoundingClientRect();
+            if (r.right > win.innerWidth + 1 || el.scrollWidth > win.innerWidth + 1) {
+                overflowing.push({
+                    tag: el.tagName,
+                    id: el.id,
+                    className: el.className,
+                    width: r.width,
+                    right: r.right,
+                    scrollWidth: el.scrollWidth
+                });
+            }
+        });
+
+        const report = {
+            viewportWidth: win.innerWidth,
+            viewportHeight: win.innerHeight,
+            scrollWidth: doc.documentElement.scrollWidth,
+            bodyScrollWidth: doc.body.scrollWidth,
+            hasHorizontalOverflow: doc.documentElement.scrollWidth > win.innerWidth || doc.body.scrollWidth > win.innerWidth,
+            overflowingCount: overflowing.length,
+            overflowingElements: overflowing.slice(0, 10),
+            sections: {}
+        };
+
+        const personCard = doc.querySelector('.luxe-review-person-card');
+        const summaryCard = doc.querySelector('.luxe-review-summary-card');
+        const garmentsSection = doc.querySelector('.luxe-review-garments-section');
+        const advanceCard = doc.querySelector('.luxe-review-advance-card');
+        const checkbox = doc.querySelector('#declaration-checkbox');
+        const payBtn = doc.querySelector('#confirm-pay-btn');
+
+        if (personCard) {
+            const r = personCard.getBoundingClientRect();
+            report.sections.personCard = { top: r.top, left: r.left, width: r.width, height: r.height };
+        }
+        if (summaryCard) {
+            const r = summaryCard.getBoundingClientRect();
+            report.sections.summaryCard = { top: r.top, left: r.left, width: r.width, height: r.height };
+        }
+        if (garmentsSection) {
+            const r = garmentsSection.getBoundingClientRect();
+            report.sections.garmentsSection = { top: r.top, left: r.left, width: r.width, height: r.height };
+        }
+        if (advanceCard) {
+            const r = advanceCard.getBoundingClientRect();
+            report.sections.advanceCard = { top: r.top, left: r.left, width: r.width, height: r.height };
+        }
+        if (checkbox) {
+            const r = checkbox.getBoundingClientRect();
+            report.sections.checkbox = { top: r.top, left: r.left, width: r.width, height: r.height };
+        }
+        if (payBtn) {
+            const r = payBtn.getBoundingClientRect();
+            report.sections.payBtn = { top: r.top, left: r.left, width: r.width, height: r.height };
+        }
+
+        const reportEl = document.createElement('div');
+        reportEl.id = 'iframe-audit-result';
+        reportEl.setAttribute('data-report', JSON.stringify(report));
+        reportEl.textContent = JSON.stringify(report);
+        document.body.appendChild(reportEl);
+    }, 200);
+};
+</script>
+
+<div id="iframe-audit-result" data-report="{&quot;viewportWidth&quot;:360,&quot;viewportHeight&quot;:852,&quot;scrollWidth&quot;:345,&quot;bodyScrollWidth&quot;:345,&quot;hasHorizontalOverflow&quot;:false,&quot;overflowingCount&quot;:18,&quot;overflowingElements&quot;:[{&quot;tag&quot;:&quot;ASIDE&quot;,&quot;id&quot;:&quot;mobile-menu&quot;,&quot;className&quot;:&quot;mobile-menu&quot;,&quot;width&quot;:316.796875,&quot;right&quot;:661.796875,&quot;scrollWidth&quot;:317},{&quot;tag&quot;:&quot;DIV&quot;,&quot;id&quot;:&quot;&quot;,&quot;className&quot;:&quot;mobile-menu-header&quot;,&quot;width&quot;:276.796875,&quot;right&quot;:641.796875,&quot;scrollWidth&quot;:277},{&quot;tag&quot;:&quot;A&quot;,&quot;id&quot;:&quot;&quot;,&quot;className&quot;:&quot;logo mobile-logo&quot;,&quot;width&quot;:187.8125,&quot;right&quot;:552.8125,&quot;scrollWidth&quot;:188},{&quot;tag&quot;:&quot;BUTTON&quot;,&quot;id&quot;:&quot;&quot;,&quot;className&quot;:&quot;mobile-menu-close&quot;,&quot;width&quot;:40,&quot;right&quot;:641.796875,&quot;scrollWidth&quot;:40},{&quot;tag&quot;:&quot;NAV&quot;,&quot;id&quot;:&quot;&quot;,&quot;className&quot;:&quot;mobile-menu-links&quot;,&quot;width&quot;:276.796875,&quot;right&quot;:641.796875,&quot;scrollWidth&quot;:277},{&quot;tag&quot;:&quot;A&quot;,&quot;id&quot;:&quot;&quot;,&quot;className&quot;:&quot;&quot;,&quot;width&quot;:276.796875,&quot;right&quot;:641.796875,&quot;scrollWidth&quot;:275},{&quot;tag&quot;:&quot;A&quot;,&quot;id&quot;:&quot;&quot;,&quot;className&quot;:&quot;&quot;,&quot;width&quot;:276.796875,&quot;right&quot;:641.796875,&quot;scrollWidth&quot;:275},{&quot;tag&quot;:&quot;A&quot;,&quot;id&quot;:&quot;&quot;,&quot;className&quot;:&quot;&quot;,&quot;width&quot;:276.796875,&quot;right&quot;:641.796875,&quot;scrollWidth&quot;:275},{&quot;tag&quot;:&quot;A&quot;,&quot;id&quot;:&quot;&quot;,&quot;className&quot;:&quot;&quot;,&quot;width&quot;:276.796875,&quot;right&quot;:641.796875,&quot;scrollWidth&quot;:275},{&quot;tag&quot;:&quot;A&quot;,&quot;id&quot;:&quot;&quot;,&quot;className&quot;:&quot;&quot;,&quot;width&quot;:276.796875,&quot;right&quot;:641.796875,&quot;scrollWidth&quot;:275}],&quot;sections&quot;:{&quot;personCard&quot;:{&quot;top&quot;:435.5,&quot;left&quot;:8,&quot;width&quot;:329,&quot;height&quot;:171},&quot;summaryCard&quot;:{&quot;top&quot;:622.5,&quot;left&quot;:8,&quot;width&quot;:329,&quot;height&quot;:197},&quot;garmentsSection&quot;:{&quot;top&quot;:835.5,&quot;left&quot;:8,&quot;width&quot;:329,&quot;height&quot;:355.296875},&quot;advanceCard&quot;:{&quot;top&quot;:1206.796875,&quot;left&quot;:8,&quot;width&quot;:329,&quot;height&quot;:559.53125},&quot;checkbox&quot;:{&quot;top&quot;:1584.796875,&quot;left&quot;:23,&quot;width&quot;:18,&quot;height&quot;:18},&quot;payBtn&quot;:{&quot;top&quot;:1657.328125,&quot;left&quot;:19,&quot;width&quot;:307,&quot;height&quot;:50}}}">{"viewportWidth":360,"viewportHeight":852,"scrollWidth":345,"bodyScrollWidth":345,"hasHorizontalOverflow":false,"overflowingCount":18,"overflowingElements":[{"tag":"ASIDE","id":"mobile-menu","className":"mobile-menu","width":316.796875,"right":661.796875,"scrollWidth":317},{"tag":"DIV","id":"","className":"mobile-menu-header","width":276.796875,"right":641.796875,"scrollWidth":277},{"tag":"A","id":"","className":"logo mobile-logo","width":187.8125,"right":552.8125,"scrollWidth":188},{"tag":"BUTTON","id":"","className":"mobile-menu-close","width":40,"right":641.796875,"scrollWidth":40},{"tag":"NAV","id":"","className":"mobile-menu-links","width":276.796875,"right":641.796875,"scrollWidth":277},{"tag":"A","id":"","className":"","width":276.796875,"right":641.796875,"scrollWidth":275},{"tag":"A","id":"","className":"","width":276.796875,"right":641.796875,"scrollWidth":275},{"tag":"A","id":"","className":"","width":276.796875,"right":641.796875,"scrollWidth":275},{"tag":"A","id":"","className":"","width":276.796875,"right":641.796875,"scrollWidth":275},{"tag":"A","id":"","className":"","width":276.796875,"right":641.796875,"scrollWidth":275}],"sections":{"personCard":{"top":435.5,"left":8,"width":329,"height":171},"summaryCard":{"top":622.5,"left":8,"width":329,"height":197},"garmentsSection":{"top":835.5,"left":8,"width":329,"height":355.296875},"advanceCard":{"top":1206.796875,"left":8,"width":329,"height":559.53125},"checkbox":{"top":1584.796875,"left":23,"width":18,"height":18},"payBtn":{"top":1657.328125,"left":19,"width":307,"height":50}}}</div></body></html>
+104881 bytes written to file C:\xampp\htdocs\shagun-ladies-tailor\scratch/iframe_shot_360px.png

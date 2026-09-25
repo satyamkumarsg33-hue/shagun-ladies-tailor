@@ -23,7 +23,7 @@ if (!defined('BASE_URL')) {
     <meta name="keywords" content="ladies tailor near me, blouse stitching, kurti stitching, lehenga stitching">
 
     <!-- CSS -->
-   <link rel="stylesheet" href="<?php echo BASE_URL; ?>assets/css/style.css?v=20260908-3">
+   <link rel="stylesheet" href="<?php echo BASE_URL; ?>assets/css/style.css?v=20260925-4">
 </head>
 <body>
 

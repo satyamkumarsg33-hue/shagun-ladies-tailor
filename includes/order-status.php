@@ -26,13 +26,24 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/auth.php';
 
-// Allowlist of recognized internal statuses
+// Four Canonical Order Lifecycle Statuses for Admin and Storefront
+const ORDER_LIFECYCLE_STATUSES = [
+    'awaiting_confirmation',
+    'stitching_in_process',
+    'completed',
+    'delivered'
+];
+
+// Allowlist of recognized internal and legacy statuses
 const ORDER_STATUS_ALLOWLIST = [
-    // Awaiting Confirmation
+    // 4 Canonical Lifecycle Statuses
+    'awaiting_confirmation',
+    'stitching_in_process',
+    'completed',
+    'delivered',
+    // Historical / Legacy Aliases
     'pending',
     'pending_confirmation',
-    'awaiting_confirmation',
-    // In Production
     'confirmed',
     'measurement_pending',
     'materials_pending',
@@ -45,17 +56,51 @@ const ORDER_STATUS_ALLOWLIST = [
     'ready_for_fitting',
     'alteration',
     'ready_for_delivery',
-    // Completed Orders
-    'delivered',
-    'collected',
-    'completed'
+    'collected'
 ];
+
+/**
+ * Maps any internal or legacy status to one of the 4 canonical lifecycle statuses:
+ * - 'awaiting_confirmation'
+ * - 'stitching_in_process'
+ * - 'completed'
+ * - 'delivered'
+ */
+function get_canonical_status(string $status): ?string {
+    $clean = strtolower(trim($status));
+    if (in_array($clean, ['pending', 'pending_confirmation', 'awaiting_confirmation'], true)) {
+        return 'awaiting_confirmation';
+    }
+    if (in_array($clean, [
+        'confirmed', 'measurement_pending', 'materials_pending', 'cutting',
+        'stitching', 'embroidery', 'quality_check', 'in_progress',
+        'in_production', 'ready_for_fitting', 'alteration', 'ready_for_delivery',
+        'stitching_in_process'
+    ], true)) {
+        return 'stitching_in_process';
+    }
+    if (in_array($clean, ['completed', 'collected'], true)) {
+        return 'completed';
+    }
+    if ($clean === 'delivered') {
+        return 'delivered';
+    }
+    return null;
+}
+
+/**
+ * Check if a status string is recognized by the canonical lifecycle or allowlist.
+ */
+function is_recognized_order_status(string $status): bool {
+    return get_canonical_status($status) !== null;
+}
 
 /**
  * Maps an internal status to one of the 3 customer-facing categories:
  * - 'awaiting_confirmation'
  * - 'in_production'
  * - 'completed'
+ * Preserved for backward compatibility with existing tests and modules.
  */
 function get_status_category(string $status): string {
     $clean = strtolower(trim($status));
@@ -82,29 +127,16 @@ function get_status_category(string $status): string {
 }
 
 /**
- * Human-readable display label for customer-facing order cards.
+ * Human-readable display label for customer-facing order cards and admin dashboard.
  */
 function get_status_display_label(string $status): string {
     $clean = strtolower(trim($status));
-    return match ($clean) {
-        'pending' => 'Order Received',
-        'pending_confirmation' => 'Awaiting Confirmation',
+    $canonical = get_canonical_status($clean);
+    return match ($canonical) {
         'awaiting_confirmation' => 'Awaiting Confirmation',
-        'confirmed' => 'Order Confirmed',
-        'measurement_pending' => 'Measurement Pending',
-        'materials_pending' => 'Materials Pending',
-        'cutting' => 'Fabric Cutting',
-        'stitching' => 'Stitching in Progress',
-        'embroidery' => 'Embroidery in Progress',
-        'quality_check' => 'Quality Checking',
-        'in_progress' => 'In Production',
-        'in_production' => 'In Production',
-        'ready_for_fitting' => 'Ready for Fitting',
-        'alteration' => 'Alterations in Progress',
-        'ready_for_delivery' => 'Ready for Delivery',
-        'delivered' => 'Delivered',
-        'collected' => 'Collected',
+        'stitching_in_process' => 'Stitching in Process',
         'completed' => 'Completed',
+        'delivered' => 'Delivered',
         default => ucwords(str_replace('_', ' ', $clean))
     };
 }
@@ -113,10 +145,12 @@ function get_status_display_label(string $status): string {
  * Returns CSS badge class for status display.
  */
 function get_status_badge_class(string $status): string {
-    $cat = get_status_category($status);
-    return match ($cat) {
+    $canonical = get_canonical_status($status);
+    return match ($canonical) {
         'awaiting_confirmation' => 'status-awaiting',
+        'stitching_in_process' => 'status-production',
         'completed' => 'status-completed',
+        'delivered' => 'status-delivered',
         default => 'status-production'
     };
 }
@@ -131,6 +165,7 @@ function get_allowed_statuses_for_role(string $role): array {
     }
     if ($role === 'master_tailor') {
         return [
+            'stitching_in_process',
             'cutting',
             'stitching',
             'embroidery',
@@ -143,13 +178,14 @@ function get_allowed_statuses_for_role(string $role): array {
     }
     if ($role === 'store_manager') {
         return [
+            'stitching_in_process',
+            'completed',
+            'delivered',
             'confirmed',
             'measurement_pending',
             'materials_pending',
             'ready_for_delivery',
-            'delivered',
-            'collected',
-            'completed'
+            'collected'
         ];
     }
     return [];
@@ -305,6 +341,34 @@ function admin_update_order_status(
         ];
     }
 
+    // Sequential transition validation:
+    // Lifecycle: awaiting_confirmation -> stitching_in_process -> completed -> delivered
+    $canonicalOld = get_canonical_status($oldStatus);
+    $canonicalNew = get_canonical_status($newStatus);
+
+    if ($canonicalOld !== $canonicalNew) {
+        $allowedNext = match ($canonicalOld) {
+            'awaiting_confirmation' => 'stitching_in_process',
+            'stitching_in_process' => 'completed',
+            'completed' => 'delivered',
+            'delivered' => null,
+            default => null
+        };
+
+        if ($allowedNext === null || $canonicalNew !== $allowedNext) {
+            $oldLabel = get_status_display_label($canonicalOld);
+            $newLabel = get_status_display_label($canonicalNew);
+            $expectedLabel = $allowedNext !== null ? get_status_display_label($allowedNext) : 'None';
+            return [
+                'success' => false,
+                'error' => "Invalid status transition. Orders in '{$oldLabel}' cannot be moved to '{$newLabel}'. Allowed next stage: '{$expectedLabel}'.",
+                'order_ref' => $orderRef,
+                'old_status' => $oldStatus,
+                'attempted_status' => $newStatus
+            ];
+        }
+    }
+
     $timestamp = time();
     $historyEntry = [
         'old_status' => $oldStatus,
@@ -398,3 +462,138 @@ function admin_update_order_status(
         'history_entry' => $historyEntry
     ];
 }
+
+/**
+ * Resolve the authoritative measurement method for an individual physical garment.
+ *
+ * Checks in priority order:
+ * 1. $garment['measurement_method']
+ * 2. $person['measurement_method'] (if inherited from person selection)
+ * 3. $_SESSION['standard_order']['measurement_method'] (for standard tailoring items)
+ *
+ * Allowed valid customer-facing choices are:
+ * - 'reference_blouse' (Sample reference garment provided)
+ * - 'visit_shop' (Measurement pending at shop)
+ *
+ * Returns null if no valid measurement method is selected.
+ */
+function get_garment_measurement_method(array $garment, ?array $person = null): ?string {
+    $allowed = ['reference_blouse', 'visit_shop'];
+
+    // 1. Direct garment-level method
+    if (!empty($garment['measurement_method']) && in_array($garment['measurement_method'], $allowed, true)) {
+        return (string) $garment['measurement_method'];
+    }
+
+    // 2. Inherited person-level method
+    if ($person !== null && !empty($person['measurement_method']) && in_array($person['measurement_method'], $allowed, true)) {
+        return (string) $person['measurement_method'];
+    }
+
+    // 3. Inherited standard stitching order method if garment source is standard
+    $isStd = ($garment['source'] ?? '') === 'standard' || !empty($garment['is_standard']);
+    if ($isStd && !empty($_SESSION['standard_order']['measurement_method']) && in_array($_SESSION['standard_order']['measurement_method'], $allowed, true)) {
+        return (string) $_SESSION['standard_order']['measurement_method'];
+    }
+
+    return null;
+}
+
+/**
+ * Checks whether an individual physical garment has a valid measurement method.
+ */
+function has_valid_garment_measurement(array $garment, ?array $person = null): bool {
+    return get_garment_measurement_method($garment, $person) !== null;
+}
+
+/**
+ * Evaluates all physical garments in an order for measurement completeness.
+ *
+ * @param array $people Luxe people array with garments
+ * @param array $standardItems Standard items array
+ * @return array{all_valid: bool, total_garments: int, valid_count: int, missing_count: int, missing_details: array}
+ */
+function validate_order_garments_measurement(array $people, array $standardItems = []): array {
+    $total = 0;
+    $valid = 0;
+    $missing = 0;
+    $missingDetails = [];
+
+    // 1. Evaluate Luxe garments per person
+    foreach ($people as $pIdx => $person) {
+        $pName = trim((string)($person['name'] ?? ('Person ' . ($pIdx + 1))));
+        $garments = $person['garments'] ?? [];
+        if (is_array($garments) && !empty($garments)) {
+            foreach ($garments as $gIdx => $garment) {
+                if (!is_array($garment)) {
+                    continue;
+                }
+                $total++;
+                $gName = trim((string)($garment['name'] ?? 'Garment'));
+                $mMethod = get_garment_measurement_method($garment, $person);
+                if ($mMethod !== null) {
+                    $valid++;
+                } else {
+                    $missing++;
+                    $missingDetails[] = [
+                        'type' => 'luxe',
+                        'person_index' => $pIdx,
+                        'person_name' => $pName,
+                        'garment_index' => $gIdx,
+                        'garment_name' => $gName,
+                        'label' => "{$pName} — {$gName} #" . ($gIdx + 1)
+                    ];
+                }
+            }
+        } else {
+            // Person with no garments array: check person-level method
+            $pMethod = $person['measurement_method'] ?? null;
+            if (in_array($pMethod, ['reference_blouse', 'visit_shop'], true)) {
+                $valid++;
+            } else {
+                $missing++;
+                $missingDetails[] = [
+                    'type' => 'luxe_person',
+                    'person_index' => $pIdx,
+                    'person_name' => $pName,
+                    'garment_index' => null,
+                    'garment_name' => 'Garments',
+                    'label' => "{$pName} (Measurement Method)"
+                ];
+            }
+            $total++;
+        }
+    }
+
+    // 2. Evaluate Standard Stitching items
+    foreach ($standardItems as $sIdx => $sItem) {
+        if (!is_array($sItem)) {
+            continue;
+        }
+        $total++;
+        $sName = trim((string)($sItem['garment_name'] ?? ($sItem['garment'] ?? 'Standard Blouse')));
+        $mMethod = get_garment_measurement_method($sItem);
+        if ($mMethod !== null) {
+            $valid++;
+        } else {
+            $missing++;
+            $missingDetails[] = [
+                'type' => 'standard',
+                'person_index' => null,
+                'person_name' => 'Self',
+                'garment_index' => $sIdx,
+                'garment_name' => $sName,
+                'label' => "Standard — {$sName} #" . ($sIdx + 1)
+            ];
+        }
+    }
+
+    return [
+        'all_valid' => ($total > 0 && $missing === 0),
+        'total_garments' => $total,
+        'valid_count' => $valid,
+        'missing_count' => $missing,
+        'missing_details' => $missingDetails
+    ];
+}
+

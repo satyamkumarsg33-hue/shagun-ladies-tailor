@@ -8,6 +8,18 @@ if (session_status() === PHP_SESSION_NONE) {
 }
 
 $luxe = $_SESSION['luxe_wedding'] ?? [];
+
+// If session holds an already completed order, redirect to orders page
+if (function_exists('is_luxe_order_completed') && is_luxe_order_completed($luxe)) {
+    $completedRef = $luxe['order_ref'] ?? ($luxe['payment']['order_ref'] ?? '');
+    if (!empty($completedRef)) {
+        header('Location: orders.php?ref=' . urlencode($completedRef));
+    } else {
+        header('Location: luxe-stitching.php');
+    }
+    exit;
+}
+
 $people = $luxe['people'] ?? [];
 
 /*

@@ -93,10 +93,10 @@ if (!function_exists('resolve_luxe_stepper_states')) {
         $isDemo = !empty($_GET['demo']) || !empty($luxe['demo_mode']);
 
         // 1. Details detection
-        $hasRequestedDate = !empty($luxe['requested_ready_date']) || !empty($luxe['wedding_date']);
+        $hasRequestedDate = !empty($options['requested_ready_date']) || !empty($options['wedding_date']) || !empty($luxe['requested_ready_date']) || !empty($luxe['wedding_date']);
 
         // 2. People & Garment stats
-        $people = $luxe['people'] ?? [];
+        $people = $options['people'] ?? ($luxe['people'] ?? []);
         $peopleCount = is_array($people) ? count($people) : 0;
         $hasNamedPerson = false;
         $totalGarments = 0;
@@ -109,16 +109,36 @@ if (!function_exists('resolve_luxe_stepper_states')) {
                 if ($pName !== '') {
                     $hasNamedPerson = true;
                 }
-                $mMethod = $person['measurement_method'] ?? null;
-                if (empty($mMethod) || !in_array($mMethod, ['reference_blouse', 'visit_shop'], true)) {
-                    $allMeasurementsSelected = false;
-                }
-                if (isset($person['garments']) && is_array($person['garments'])) {
-                    foreach ($person['garments'] as $g) {
+                $garments = $person['garments'] ?? [];
+                if (is_array($garments) && !empty($garments)) {
+                    foreach ($garments as $g) {
                         $totalGarments++;
                         if (is_array($g) && ($g['status'] ?? '') === 'completed') {
                             $completedGarments++;
                         }
+                        $gMethod = is_array($g) ? ($g['measurement_method'] ?? ($person['measurement_method'] ?? null)) : null;
+                        if (empty($gMethod) || !in_array($gMethod, ['reference_blouse', 'visit_shop'], true)) {
+                            $allMeasurementsSelected = false;
+                        }
+                    }
+                } else {
+                    $totalGarments++;
+                    $mMethod = $person['measurement_method'] ?? null;
+                    if (empty($mMethod) || !in_array($mMethod, ['reference_blouse', 'visit_shop'], true)) {
+                        $allMeasurementsSelected = false;
+                    }
+                }
+            }
+        }
+
+        // Standard stitching items in unified cart check
+        if (function_exists('get_unified_basket')) {
+            $unified = get_unified_basket();
+            if (!empty($unified['standard_items'])) {
+                foreach ($unified['standard_items'] as $sItem) {
+                    $sMethod = $sItem['measurement_method'] ?? ($_SESSION['standard_order']['measurement_method'] ?? null);
+                    if (empty($sMethod) || !in_array($sMethod, ['reference_blouse', 'visit_shop'], true)) {
+                        $allMeasurementsSelected = false;
                     }
                 }
             }

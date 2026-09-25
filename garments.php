@@ -9,8 +9,18 @@ if (!isset($_SESSION['luxe_wedding']) || !is_array($_SESSION['luxe_wedding'])) {
     $_SESSION['luxe_wedding'] = [];
 }
 
-$luxeWedding = &$_SESSION['luxe_wedding'];
+// If session holds an already completed order, redirect to orders page
+if (function_exists('is_luxe_order_completed') && is_luxe_order_completed($_SESSION['luxe_wedding'])) {
+    $completedRef = $_SESSION['luxe_wedding']['order_ref'] ?? ($_SESSION['luxe_wedding']['payment']['order_ref'] ?? '');
+    if (!empty($completedRef)) {
+        header('Location: orders.php?ref=' . urlencode($completedRef));
+    } else {
+        header('Location: luxe-stitching.php');
+    }
+    exit;
+}
 
+$luxeWedding = &$_SESSION['luxe_wedding'];
 
 /*
  * Get people from the Luxe wedding session.

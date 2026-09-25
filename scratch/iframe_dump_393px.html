@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html><head>
+<meta charset="utf-8">
+<style>
+  body { margin: 0; padding: 0; background: #222; }
+  iframe { border: none; width: 393px; height: 852px; display: block; }
+</style>
+</head>
+<body>
+<iframe id="frame" src="rendered_review_test.html"></iframe>
+<script>
+const frame = document.getElementById('frame');
+frame.onload = function() {
+    setTimeout(function() {
+        const doc = frame.contentDocument;
+        const win = frame.contentWindow;
+        
+        // Find all elements overflowing viewport
+        const overflowing = [];
+        doc.querySelectorAll('*').forEach(el => {
+            const r = el.getBoundingClientRect();
+            if (r.right > win.innerWidth + 1 || el.scrollWidth > win.innerWidth + 1) {
+                overflowing.push({
+                    tag: el.tagName,
+                    id: el.id,
+                    className: el.className,
+                    width: r.width,
+                    right: r.right,
+                    scrollWidth: el.scrollWidth
+                });
+            }
+        });
+
+        const report = {
+            viewportWidth: win.innerWidth,
+            viewportHeight: win.innerHeight,
+            scrollWidth: doc.documentElement.scrollWidth,
+            bodyScrollWidth: doc.body.scrollWidth,
+            hasHorizontalOverflow: doc.documentElement.scrollWidth > win.innerWidth || doc.body.scrollWidth > win.innerWidth,
+            overflowingCount: overflowing.length,
+            overflowingElements: overflowing.slice(0, 10),
+            sections: {}
+        };
+
+        const personCard = doc.querySelector('.luxe-review-person-card');
+        const summaryCard = doc.querySelector('.luxe-review-summary-card');
+        const garmentsSection = doc.querySelector('.luxe-review-garments-section');
+        const advanceCard = doc.querySelector('.luxe-review-advance-card');
+        const checkbox = doc.querySelector('#declaration-checkbox');
+        const payBtn = doc.querySelector('#confirm-pay-btn');
+
+        if (personCard) {
+            const r = personCard.getBoundingClientRect();
+            report.sections.personCard = { top: r.top, left: r.left, width: r.width, height: r.height };
+        }
+        if (summaryCard) {
+            const r = summaryCard.getBoundingClientRect();
+            report.sections.summaryCard = { top: r.top, left: r.left, width: r.width, height: r.height };
+        }
+        if (garmentsSection) {
+            const r = garmentsSection.getBoundingClientRect();
+            report.sections.garmentsSection = { top: r.top, left: r.left, width: r.width, height: r.height };
+        }
+        if (advanceCard) {
+            const r = advanceCard.getBoundingClientRect();
+            report.sections.advanceCard = { top: r.top, left: r.left, width: r.width, height: r.height };
+        }
+        if (checkbox) {
+            const r = checkbox.getBoundingClientRect();
+            report.sections.checkbox = { top: r.top, left: r.left, width: r.width, height: r.height };
+        }
+        if (payBtn) {
+            const r = payBtn.getBoundingClientRect();
+            report.sections.payBtn = { top: r.top, left: r.left, width: r.width, height: r.height };
+        }
+
+        const reportEl = document.createElement('div');
+        reportEl.id = 'iframe-audit-result';
+        reportEl.setAttribute('data-report', JSON.stringify(report));
+        reportEl.textContent = JSON.stringify(report);
+        document.body.appendChild(reportEl);
+    }, 200);
+};
+</script>
+
+<div id="iframe-audit-result" data-report="{&quot;viewportWidth&quot;:393,&quot;viewportHeight&quot;:852,&quot;scrollWidth&quot;:378,&quot;bodyScrollWidth&quot;:378,&quot;hasHorizontalOverflow&quot;:false,&quot;overflowingCount&quot;:18,&quot;overflowingElements&quot;:[{&quot;tag&quot;:&quot;ASIDE&quot;,&quot;id&quot;:&quot;mobile-menu&quot;,&quot;className&quot;:&quot;mobile-menu&quot;,&quot;width&quot;:340,&quot;right&quot;:718,&quot;scrollWidth&quot;:340},{&quot;tag&quot;:&quot;DIV&quot;,&quot;id&quot;:&quot;&quot;,&quot;className&quot;:&quot;mobile-menu-header&quot;,&quot;width&quot;:300,&quot;right&quot;:698,&quot;scrollWidth&quot;:300},{&quot;tag&quot;:&quot;A&quot;,&quot;id&quot;:&quot;&quot;,&quot;className&quot;:&quot;logo mobile-logo&quot;,&quot;width&quot;:187.8125,&quot;right&quot;:585.8125,&quot;scrollWidth&quot;:188},{&quot;tag&quot;:&quot;BUTTON&quot;,&quot;id&quot;:&quot;&quot;,&quot;className&quot;:&quot;mobile-menu-close&quot;,&quot;width&quot;:40,&quot;right&quot;:698,&quot;scrollWidth&quot;:40},{&quot;tag&quot;:&quot;NAV&quot;,&quot;id&quot;:&quot;&quot;,&quot;className&quot;:&quot;mobile-menu-links&quot;,&quot;width&quot;:300,&quot;right&quot;:698,&quot;scrollWidth&quot;:300},{&quot;tag&quot;:&quot;A&quot;,&quot;id&quot;:&quot;&quot;,&quot;className&quot;:&quot;&quot;,&quot;width&quot;:300,&quot;right&quot;:698,&quot;scrollWidth&quot;:298},{&quot;tag&quot;:&quot;A&quot;,&quot;id&quot;:&quot;&quot;,&quot;className&quot;:&quot;&quot;,&quot;width&quot;:300,&quot;right&quot;:698,&quot;scrollWidth&quot;:298},{&quot;tag&quot;:&quot;A&quot;,&quot;id&quot;:&quot;&quot;,&quot;className&quot;:&quot;&quot;,&quot;width&quot;:300,&quot;right&quot;:698,&quot;scrollWidth&quot;:298},{&quot;tag&quot;:&quot;A&quot;,&quot;id&quot;:&quot;&quot;,&quot;className&quot;:&quot;&quot;,&quot;width&quot;:300,&quot;right&quot;:698,&quot;scrollWidth&quot;:298},{&quot;tag&quot;:&quot;A&quot;,&quot;id&quot;:&quot;&quot;,&quot;className&quot;:&quot;&quot;,&quot;width&quot;:300,&quot;right&quot;:698,&quot;scrollWidth&quot;:298}],&quot;sections&quot;:{&quot;personCard&quot;:{&quot;top&quot;:439.5,&quot;left&quot;:12,&quot;width&quot;:354,&quot;height&quot;:175},&quot;summaryCard&quot;:{&quot;top&quot;:630.5,&quot;left&quot;:12,&quot;width&quot;:354,&quot;height&quot;:201},&quot;garmentsSection&quot;:{&quot;top&quot;:847.5,&quot;left&quot;:12,&quot;width&quot;:354,&quot;height&quot;:359.296875},&quot;advanceCard&quot;:{&quot;top&quot;:1222.796875,&quot;left&quot;:12,&quot;width&quot;:354,&quot;height&quot;:569.53125},&quot;checkbox&quot;:{&quot;top&quot;:1608.796875,&quot;left&quot;:31,&quot;width&quot;:18,&quot;height&quot;:18},&quot;payBtn&quot;:{&quot;top&quot;:1681.328125,&quot;left&quot;:27,&quot;width&quot;:324,&quot;height&quot;:50}}}">{"viewportWidth":393,"viewportHeight":852,"scrollWidth":378,"bodyScrollWidth":378,"hasHorizontalOverflow":false,"overflowingCount":18,"overflowingElements":[{"tag":"ASIDE","id":"mobile-menu","className":"mobile-menu","width":340,"right":718,"scrollWidth":340},{"tag":"DIV","id":"","className":"mobile-menu-header","width":300,"right":698,"scrollWidth":300},{"tag":"A","id":"","className":"logo mobile-logo","width":187.8125,"right":585.8125,"scrollWidth":188},{"tag":"BUTTON","id":"","className":"mobile-menu-close","width":40,"right":698,"scrollWidth":40},{"tag":"NAV","id":"","className":"mobile-menu-links","width":300,"right":698,"scrollWidth":300},{"tag":"A","id":"","className":"","width":300,"right":698,"scrollWidth":298},{"tag":"A","id":"","className":"","width":300,"right":698,"scrollWidth":298},{"tag":"A","id":"","className":"","width":300,"right":698,"scrollWidth":298},{"tag":"A","id":"","className":"","width":300,"right":698,"scrollWidth":298},{"tag":"A","id":"","className":"","width":300,"right":698,"scrollWidth":298}],"sections":{"personCard":{"top":439.5,"left":12,"width":354,"height":175},"summaryCard":{"top":630.5,"left":12,"width":354,"height":201},"garmentsSection":{"top":847.5,"left":12,"width":354,"height":359.296875},"advanceCard":{"top":1222.796875,"left":12,"width":354,"height":569.53125},"checkbox":{"top":1608.796875,"left":31,"width":18,"height":18},"payBtn":{"top":1681.328125,"left":27,"width":324,"height":50}}}</div></body></html>
+102601 bytes written to file C:\xampp\htdocs\shagun-ladies-tailor\scratch/iframe_shot_393px.png

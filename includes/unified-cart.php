@@ -36,8 +36,10 @@ function get_unified_basket(): array
 
     $luxeWedding = $_SESSION['luxe_wedding'] ?? [];
     // An already completed/paid Luxe session is not an active unpurchased draft
-    $isLuxePaid = (!empty($luxeWedding['payment']['status']) && $luxeWedding['payment']['status'] === 'completed');
-    $luxePeople = (!$isLuxePaid && isset($luxeWedding['people']) && is_array($luxeWedding['people'])) ? $luxeWedding['people'] : [];
+    $hasActiveLuxe = function_exists('has_active_luxe_draft') 
+        ? has_active_luxe_draft() 
+        : (!empty($luxeWedding['people']) && !(function_exists('is_luxe_order_completed') && is_luxe_order_completed($luxeWedding)));
+    $luxePeople = ($hasActiveLuxe && isset($luxeWedding['people']) && is_array($luxeWedding['people'])) ? $luxeWedding['people'] : [];
 
     $hasStandard = !empty($standardCartItems);
     $hasLuxe = false;
@@ -192,6 +194,10 @@ function get_unified_basket(): array
             $badges[] = 'HAND WORK';
         }
 
+        $stdMethod = in_array($item['measurement_method'] ?? ($_SESSION['standard_order']['measurement_method'] ?? ''), ['reference_blouse', 'visit_shop'], true)
+            ? ($item['measurement_method'] ?? $_SESSION['standard_order']['measurement_method'])
+            : null;
+
         $normItem = [
             'id' => $id,
             'source' => 'standard',
@@ -200,6 +206,7 @@ function get_unified_basket(): array
             'customer_name' => $personName,
             'person_name' => $personName,
             'person_role' => 'Self',
+            'measurement_method' => $stdMethod,
             'garment_name' => $garmentName,
             'item_number' => $stdItemNum,
             'item_label' => $garmentName . ' #' . $stdItemNum,
@@ -232,7 +239,9 @@ function get_unified_basket(): array
 
             $personName = trim((string) ($person['name'] ?? ('Person ' . ($personIndex + 1))));
             $personRole = trim((string) ($person['role'] ?? ''));
-            $measurementMethod = (string) ($person['measurement_method'] ?? 'reference_blouse');
+            $personMethod = in_array($person['measurement_method'] ?? '', ['reference_blouse', 'visit_shop'], true)
+                ? (string) $person['measurement_method']
+                : null;
             $typeCounters = [];
 
             foreach ($person['garments'] as $garmentIndex => $garment) {
@@ -340,6 +349,10 @@ function get_unified_basket(): array
 
                 $editUrl = 'customize-blouse.php?style=' . urlencode($styleSlug) . '&luxe=1&person=' . ($personIndex + 1) . '&garment=' . urlencode($gName) . '&garment_idx=' . $garmentIndex;
 
+                $garmentMeasurementMethod = in_array($garment['measurement_method'] ?? '', ['reference_blouse', 'visit_shop'], true)
+                    ? (string) $garment['measurement_method']
+                    : $personMethod;
+
                 $normLuxeItem = [
                     'id' => 'luxe_' . $personIndex . '_' . $garmentIndex,
                     'source' => 'luxe',
@@ -350,7 +363,7 @@ function get_unified_basket(): array
                     'person_role' => $personRole,
                     'person_index' => $personIndex,
                     'garment_index' => $garmentIndex,
-                    'measurement_method' => $measurementMethod,
+                    'measurement_method' => $garmentMeasurementMethod,
                     'garment_name' => $gName,
                     'item_number' => $typeCounters[$gName],
                     'item_label' => $numberedLabel,
@@ -421,12 +434,21 @@ function get_unified_basket(): array
         }
     }
 
+    $hasMissingMeasurement = false;
+    foreach ($allItems as $it) {
+        if (empty($it['measurement_method'])) {
+            $hasMissingMeasurement = true;
+            break;
+        }
+    }
+
     return [
         'has_standard' => $hasStandard,
         'has_luxe' => $hasLuxe,
         'is_combined' => ($hasStandard && $hasLuxe),
         'has_separate_cloth' => $hasSeparateCloth,
         'has_incomplete_luxe' => $hasIncompleteLuxe,
+        'has_missing_measurement' => $hasMissingMeasurement,
         'standard_items' => $standardItems,
         'luxe_items' => $luxeItems,
         'all_items' => $allItems,
@@ -547,4 +569,49 @@ function render_item_category_badges(mixed $itemOrBadges, ?string $defaultSource
     }
     $html .= '</div>';
     return $html;
+}
+
+/**
+ * Update measurement method for an existing standard stitching garment in session.
+ * Maintains ONE PHYSICAL GARMENT = ONE INDEPENDENT RECORD.
+ * Does not create duplicate Luxe garments.
+ *
+ * @param string $keyOrId Item ID or cart array index
+ * @param string $method 'reference_blouse' or 'visit_shop'
+ */
+function update_standard_garment_measurement(string $keyOrId, string $method): void {
+    if (!in_array($method, ['reference_blouse', 'visit_shop'], true)) {
+        return;
+    }
+
+    if (session_status() === PHP_SESSION_NONE) {
+        session_start();
+    }
+
+    // 1. Update $_SESSION['demo_cart']
+    if (isset($_SESSION['demo_cart']['items']) && is_array($_SESSION['demo_cart']['items'])) {
+        foreach ($_SESSION['demo_cart']['items'] as $k => &$item) {
+            if ((string)$k === (string)$keyOrId || (string)($item['id'] ?? '') === (string)$keyOrId) {
+                $item['measurement_method'] = $method;
+            }
+        }
+        unset($item);
+    }
+    if (isset($_SESSION['demo_cart']) && is_array($_SESSION['demo_cart'])) {
+        foreach ($_SESSION['demo_cart'] as $k => &$item) {
+            if ($k === 'items') continue;
+            if (is_array($item)) {
+                if ((string)$k === (string)$keyOrId || (string)($item['id'] ?? '') === (string)$keyOrId) {
+                    $item['measurement_method'] = $method;
+                }
+            }
+        }
+        unset($item);
+    }
+
+    // 2. Also update $_SESSION['standard_order']['measurement_method']
+    if (!isset($_SESSION['standard_order']) || !is_array($_SESSION['standard_order'])) {
+        $_SESSION['standard_order'] = [];
+    }
+    $_SESSION['standard_order']['measurement_method'] = $method;
 }

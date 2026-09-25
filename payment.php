@@ -24,7 +24,7 @@ if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 
-$luxe = $_SESSION['luxe_wedding'] ?? [];
+$luxe = $_SESSION['luxe_wedding'] ?? ($_SESSION['last_completed_luxe_order'] ?? []);
 $people = $luxe['people'] ?? [];
 $advancePayment = $luxe['advance_payment'] ?? null;
 
@@ -47,12 +47,12 @@ if (!is_array($people) || count($people) === 0) {
     $allMeasurementsSelected = true;
 
     foreach ($people as $p) {
-        $mMethod = $p['measurement_method'] ?? null;
-        if (empty($mMethod) || !in_array($mMethod, ['reference_blouse', 'visit_shop'], true)) {
-            $allMeasurementsSelected = false;
-        }
-
-        if (!isset($p['garments']) || !is_array($p['garments'])) {
+        if (!isset($p['garments']) || !is_array($p['garments']) || empty($p['garments'])) {
+            $totalGarments++;
+            $pMethod = $p['measurement_method'] ?? null;
+            if (empty($pMethod) || !in_array($pMethod, ['reference_blouse', 'visit_shop'], true)) {
+                $allMeasurementsSelected = false;
+            }
             continue;
         }
 
@@ -76,6 +76,12 @@ if (!is_array($people) || count($people) === 0) {
             if ($status === 'completed' || ($isCust && $isW)) {
                 $completedGarments++;
             }
+
+            // Each individual physical garment must have a valid measurement method
+            $gMethod = is_array($g) ? ($g['measurement_method'] ?? ($p['measurement_method'] ?? null)) : null;
+            if (empty($gMethod) || !in_array($gMethod, ['reference_blouse', 'visit_shop'], true)) {
+                $allMeasurementsSelected = false;
+            }
         }
     }
 
@@ -86,7 +92,7 @@ if (!is_array($people) || count($people) === 0) {
     }
 
     if (!$allMeasurementsSelected) {
-        header('Location: measurements.php');
+        header('Location: measurements.php?missing=1');
         exit;
     }
 
@@ -102,9 +108,23 @@ if (!is_array($people) || count($people) === 0) {
     $advanceAmount = (int) ($advancePayment['selected_amount'] ?? 0);
     $remainingBalance = $grandTotal - $advanceAmount;
     
-    // Order Reference
-    if (empty($_SESSION['luxe_wedding']['payment']['order_ref'])) {
-        $orderRef = 'LT' . date('Ymd') . '-' . str_pad((string) mt_rand(1, 999), 3, '0', STR_PAD_LEFT);
+    // Order Reference: Generate a unique reference that does not collide with existing DB orders
+    if (empty($_SESSION['luxe_wedding']['payment']['order_ref']) || !empty($_SESSION['luxe_wedding']['is_submitted'])) {
+        do {
+            $candidateRef = 'LT' . date('Ymd') . '-' . str_pad((string) mt_rand(1, 999), 3, '0', STR_PAD_LEFT);
+            $exists = false;
+            try {
+                $pdo = get_db_connection();
+                $chkStmt = $pdo->prepare('SELECT id FROM orders WHERE order_ref = :ref LIMIT 1');
+                $chkStmt->execute([':ref' => $candidateRef]);
+                if ($chkStmt->fetch()) {
+                    $exists = true;
+                }
+            } catch (\Throwable $e) {
+                $exists = false;
+            }
+        } while ($exists);
+        $orderRef = $candidateRef;
     } else {
         $orderRef = $_SESSION['luxe_wedding']['payment']['order_ref'];
     }
@@ -207,6 +227,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         if ($saved) {
             $paymentState = 'success';
+            // Decouple completed order from subsequent active drafts
+            $_SESSION['luxe_wedding']['is_submitted'] = true;
+            $_SESSION['last_completed_luxe_order'] = $_SESSION['luxe_wedding'];
+            unset($_SESSION['luxe_wedding']);
+            unset($_SESSION['standard_order']);
             // Only clear cart after successful transaction commit
             if (function_exists('demo_cart_clear')) {
                 demo_cart_clear();
@@ -828,7 +853,11 @@ include __DIR__ . '/includes/header.php';
                                     <span>Download SHAGUN — Order Dossier (PDF)</span>
                                 </a>
                             </div>
-                            <div class="luxe-home-btn-row">
+                            <div class="luxe-home-btn-row" style="display: flex; gap: 12px; justify-content: center; flex-wrap: wrap;">
+                                <a href="luxe-stitching.php" class="luxe-btn-back-home" id="start-new-luxe-btn-desktop" style="background: #9e6c38; color: #fff; border-color: #9e6c38;">
+                                    <span class="luxe-action-icon" aria-hidden="true">✨</span>
+                                    <span>Plan Another Luxe Order</span>
+                                </a>
                                 <a href="index.php" class="luxe-btn-back-home" id="back-home-btn-desktop">
                                     <span class="luxe-action-icon" aria-hidden="true">🏠</span>
                                     <span>Back to Home</span>
@@ -845,6 +874,10 @@ include __DIR__ . '/includes/header.php';
                             <a href="orders.php?action=download_dossier&ref=<?php echo urlencode($orderRef); ?>" class="luxe-btn-download-dossier" id="download-dossier-btn-mobile">
                                 <span class="luxe-action-icon" aria-hidden="true">⬇</span>
                                 <span>Download SHAGUN — Order Dossier (PDF)</span>
+                            </a>
+                            <a href="luxe-stitching.php" class="luxe-btn-back-home" id="start-new-luxe-btn-mobile" style="background: #9e6c38; color: #fff; border-color: #9e6c38; margin-bottom: 8px;">
+                                <span class="luxe-action-icon" aria-hidden="true">✨</span>
+                                <span>Plan Another Luxe Order</span>
                             </a>
                             <a href="index.php" class="luxe-btn-back-home" id="back-home-btn-mobile">
                                 <span class="luxe-action-icon" aria-hidden="true">🏠</span>

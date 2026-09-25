@@ -25,6 +25,7 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/includes/auth.php';
 require_once __DIR__ . '/includes/order-status.php';
+require_once __DIR__ . '/includes/completion-dossier-pdf.php';
 require_user_login('orders.php');
 
 if (session_status() === PHP_SESSION_NONE) {
@@ -41,6 +42,25 @@ $requestedRef = trim((string) ($_GET['ref'] ?? ''));
 $customerOrders = get_customer_orders($currentUserId);
 if (!is_array($customerOrders)) {
     $customerOrders = [];
+}
+
+// Preload completed photos count for customer orders
+$completedPhotoCounts = [];
+try {
+    $pdo = get_db_connection();
+    $cpStmt = $pdo->prepare("
+        SELECT ogp.order_id, COUNT(*) as cnt 
+        FROM order_gallery_photos ogp
+        JOIN orders o ON o.id = ogp.order_id
+        WHERE o.user_id = :uid AND ogp.stage = 'completed'
+        GROUP BY ogp.order_id
+    ");
+    $cpStmt->execute([':uid' => $currentUserId]);
+    while ($cpRow = $cpStmt->fetch(PDO::FETCH_ASSOC)) {
+        $completedPhotoCounts[(int)$cpRow['order_id']] = (int)$cpRow['cnt'];
+    }
+} catch (\Throwable $e) {
+    error_log('[Customer Photo Count Error] ' . $e->getMessage());
 }
 
 // Session orders check
@@ -200,6 +220,78 @@ if (isset($_GET['action']) && $_GET['action'] === 'download_dossier') {
         header('Location: orders.php');
         exit;
     }
+}
+
+// -------------------------------------------------------------
+// GET HANDLER: Customer Completion Dossier Download Route
+// -------------------------------------------------------------
+if (isset($_GET['action']) && $_GET['action'] === 'download_completion_dossier') {
+    $targetRef = trim((string) ($_GET['ref'] ?? ''));
+    if ($targetRef !== '') {
+        try {
+            $pdo = get_db_connection();
+            $ordStmt = $pdo->prepare('SELECT * FROM orders WHERE order_ref = :ref LIMIT 1');
+            $ordStmt->execute([':ref' => $targetRef]);
+            $dbOrd = $ordStmt->fetch(PDO::FETCH_ASSOC);
+
+            // Ownership check: must belong to the logged-in customer
+            if ($dbOrd && (int)$dbOrd['user_id'] === $currentUserId) {
+                $canonicalStatus = get_canonical_status((string)$dbOrd['status']);
+                if ($canonicalStatus === 'completed' || $canonicalStatus === 'delivered') {
+                    $orderId = (int)$dbOrd['id'];
+                    $photoStmt = $pdo->prepare("SELECT * FROM order_gallery_photos WHERE order_id = :oid AND stage = 'completed' ORDER BY created_at ASC");
+                    $photoStmt->execute([':oid' => $orderId]);
+                    $completedPhotos = $photoStmt->fetchAll(PDO::FETCH_ASSOC);
+
+                    if (!empty($completedPhotos)) {
+                        $inPhotoStmt = $pdo->prepare("SELECT * FROM order_gallery_photos WHERE order_id = :oid AND stage = 'awaiting_confirmation' ORDER BY created_at ASC LIMIT 3");
+                        $inPhotoStmt->execute([':oid' => $orderId]);
+                        $intakePhotos = $inPhotoStmt->fetchAll(PDO::FETCH_ASSOC);
+
+                        $orderData = get_customer_order_by_ref($targetRef, $currentUserId);
+                        if (!$orderData) {
+                            $orderData = $dbOrd;
+                        }
+                        $custProfile = $currentUserId > 0 ? get_customer_profile($currentUserId) : null;
+                        if ($custProfile) {
+                            $orderData['customer_name'] = $custProfile['name'];
+                            $orderData['customer_phone'] = $custProfile['phone'];
+                            $orderData['customer_email'] = $custProfile['email'];
+                            $orderData['customer_address'] = $custProfile['address'];
+                            $orderData['phone_display'] = $custProfile['phone_display'];
+                            $orderData['address_display'] = $custProfile['address_display'];
+                        }
+                        $orderData['id'] = $orderId;
+                        $orderData['completed_photos'] = $completedPhotos;
+                        $orderData['intake_photos'] = $intakePhotos;
+                        $orderData['canonical_status'] = $canonicalStatus;
+
+                        // Customer sequence label
+                        $seqMap = get_customer_order_sequence_map($pdo);
+                        $seq = $seqMap['by_order_id'][$orderId] ?? ($seqMap['by_order_ref'][$targetRef] ?? 1);
+                        $orderData['customer_sequence'] = $seq;
+                        $orderData['customer_sequence_label'] = get_customer_sequence_label($seq);
+
+                        // Financials
+                        $payStmt = $pdo->prepare("SELECT COALESCE(SUM(amount), 0) FROM order_payments WHERE order_id = :oid AND status = 'completed'");
+                        $payStmt->execute([':oid' => $orderId]);
+                        $completedPaySum = (float)$payStmt->fetchColumn();
+                        $orderData['total_amount'] = (float)$dbOrd['total_amount'];
+                        $orderData['amount_paid'] = $completedPaySum > 0 ? $completedPaySum : (float)$dbOrd['advance_amount'];
+                        $orderData['remaining_balance'] = max(0.0, (float)$dbOrd['total_amount'] - $orderData['amount_paid']);
+                        $orderData['payment_status'] = ($orderData['amount_paid'] >= $orderData['total_amount'] && $orderData['total_amount'] > 0) ? 'fully_paid' : (($orderData['amount_paid'] > 0) ? 'partially_paid' : 'unpaid');
+
+                        ShagunCompletionDossierPdf::download($orderData);
+                        exit;
+                    }
+                }
+            }
+        } catch (\Throwable $e) {
+            error_log('[Customer Completion Dossier Error] ' . $e->getMessage());
+        }
+    }
+    header('Location: orders.php');
+    exit;
 }
 
 // -------------------------------------------------------------
@@ -718,6 +810,26 @@ include __DIR__ . '/includes/header.php';
                                                     <span class="btn-icon" aria-hidden="true">⬇</span>
                                                     <span>Download SHAGUN — Order Dossier (PDF)</span>
                                                 </a>
+                                                <?php 
+                                                $ordId = (int)($order['raw']['id'] ?? ($order['id'] ?? 0));
+                                                $catStatus = $order['status_category'] ?? '';
+                                                $cCanon = get_canonical_status((string)($order['raw_status'] ?? ''));
+                                                $isEligibleCompletion = ($catStatus === 'completed' || $cCanon === 'completed' || $cCanon === 'delivered');
+                                                $numCompletedPhotos = $completedPhotoCounts[$ordId] ?? 0;
+                                                ?>
+                                                <?php if ($isEligibleCompletion): ?>
+                                                    <?php if ($numCompletedPhotos > 0): ?>
+                                                        <a href="orders.php?action=download_completion_dossier&ref=<?php echo urlencode($order['order_ref']); ?>" class="luxe-btn-download-pdf luxe-btn-completion-pdf" id="download-completion-dossier-<?php echo htmlspecialchars($order['order_ref']); ?>">
+                                                            <span class="btn-icon" aria-hidden="true">✨</span>
+                                                            <span>Download Completion Dossier (PDF)</span>
+                                                        </a>
+                                                    <?php else: ?>
+                                                        <span class="luxe-btn-download-pdf luxe-btn-completion-pdf" style="opacity: 0.6; cursor: not-allowed;" title="Completion Dossier will be available once completed garment photos are added by the atelier">
+                                                            <span class="btn-icon" aria-hidden="true">✨</span>
+                                                            <span>Completion Dossier (Photos Pending)</span>
+                                                        </span>
+                                                    <?php endif; ?>
+                                                <?php endif; ?>
                                                 <button type="button" class="luxe-btn-print" onclick="window.print();">
                                                     🖨️ Print Record
                                                 </button>

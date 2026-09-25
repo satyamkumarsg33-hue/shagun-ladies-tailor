@@ -512,7 +512,7 @@ function auth_post_login_cart_transfer(int $userId): void {
     // 2. Clear unauthorized or foreign checkout / workspace drafts
     if (isset($_SESSION['standard_order'])) {
         $stdUserId = (int)($_SESSION['standard_order']['user_id'] ?? 0);
-        if ($stdUserId !== $userId) {
+        if ($stdUserId !== $userId || (function_exists('is_standard_order_completed') && is_standard_order_completed($_SESSION['standard_order']))) {
             unset($_SESSION['standard_order']);
         }
     }
@@ -520,7 +520,7 @@ function auth_post_login_cart_transfer(int $userId): void {
     // Luxe drafts require authentication and must NEVER transfer between customer accounts
     if (isset($_SESSION['luxe_wedding'])) {
         $luxeUserId = (int)($_SESSION['luxe_wedding']['user_id'] ?? 0);
-        if ($luxeUserId !== $userId) {
+        if ($luxeUserId !== $userId || (function_exists('is_luxe_order_completed') && is_luxe_order_completed($_SESSION['luxe_wedding']))) {
             unset($_SESSION['luxe_wedding']);
         }
     }
@@ -583,12 +583,12 @@ function save_customer_completed_order(array $orderData): bool {
 
         // 2. Resolve Workflow Type (strictly within allowed enum: standard, wedding, family, bulk)
         $rawWorkflow = strtolower(trim((string)($orderData['workflow'] ?? 'standard')));
-        $hasLuxe = !empty($orderData['people']) || !empty($orderData['luxe_wedding']) || $rawWorkflow === 'wedding' || $rawWorkflow === 'luxe';
         $workflowType = match ($rawWorkflow) {
+            'standard' => 'standard',
             'wedding', 'luxe' => 'wedding',
             'family' => 'family',
             'bulk' => 'bulk',
-            default => ($hasLuxe ? 'wedding' : 'standard')
+            default => (!empty($orderData['luxe_wedding']) ? 'wedding' : 'standard')
         };
 
         // 3. Extract & Calculate Financials Server-Side
@@ -1173,6 +1173,7 @@ function get_customer_orders(?int $userId = null): array {
 
     // 1. Permanent database retrieval
     try {
+        $custProfile = get_customer_profile($userId);
         $pdo = get_db_connection();
         $ordStmt = $pdo->prepare('SELECT * FROM orders WHERE user_id = :uid ORDER BY created_at DESC');
         $ordStmt->execute([':uid' => $userId]);
@@ -1289,6 +1290,12 @@ function get_customer_orders(?int $userId = null): array {
                 'id' => $orderId,
                 'order_ref' => $ref,
                 'user_id' => $userId,
+                'customer_name' => $custProfile['name'] ?? ($dbOrd['customer_name'] ?? 'Valued Customer'),
+                'customer_phone' => $custProfile['phone'] ?? ($dbOrd['customer_phone'] ?? null),
+                'customer_email' => $custProfile['email'] ?? ($dbOrd['customer_email'] ?? null),
+                'customer_address' => $custProfile['address'] ?? ($dbOrd['customer_address'] ?? null),
+                'phone_display' => $custProfile['phone_display'] ?? 'Phone number not provided',
+                'address_display' => $custProfile['address_display'] ?? 'Address not provided',
                 'workflow' => $dbOrd['workflow_type'],
                 'order_type' => $dbOrd['workflow_type'] === 'standard' ? 'Standard Stitching' : 'Luxe Stitching',
                 'occasion' => $dbOrd['occasion'],
@@ -1341,6 +1348,207 @@ function get_customer_order_by_ref(string $orderRef, ?int $userId = null): ?arra
     $orders = get_customer_orders($userId);
     return $orders[$orderRef] ?? null;
 }
+
+/**
+ * Check whether a Luxe session payload represents an already completed/persisted order.
+ * A completed order is a permanent database record and must never leak as an active builder draft.
+ */
+function is_luxe_order_completed(?array $draft = null): bool {
+    if (session_status() === PHP_SESSION_NONE) {
+        session_start();
+    }
+    if ($draft === null) {
+        $draft = $_SESSION['luxe_wedding'] ?? [];
+    }
+    if (!is_array($draft) || empty($draft)) {
+        return false;
+    }
+    // Check payment completion
+    if (!empty($draft['payment']['status']) && $draft['payment']['status'] === 'completed') {
+        return true;
+    }
+    // Check explicit submitted flag
+    if (!empty($draft['is_submitted'])) {
+        return true;
+    }
+    // Check canonical / internal status if progressed beyond initial draft
+    if (!empty($draft['status']) && !in_array($draft['status'], ['draft', ''], true)) {
+        return true;
+    }
+    // Check booked date presence with an assigned order reference
+    if (!empty($draft['order_ref']) && !empty($draft['booked_date'])) {
+        return true;
+    }
+    // Check assigned order reference (an active draft never has a permanent order reference)
+    if (!empty($draft['order_ref'])) {
+        return true;
+    }
+    return false;
+}
+
+/**
+ * Backward compatibility alias for is_luxe_order_completed().
+ */
+function is_luxe_draft_completed(?array $draft = null): bool {
+    return is_luxe_order_completed($draft);
+}
+
+/**
+ * Check whether the current session has an active, in-progress (uncompleted) Luxe draft
+ * with actual garments under construction.
+ * 
+ * Strict Isolation Rules:
+ * - A completed order (paid, submitted, or permanently booked) is NEVER an active draft.
+ * - Historical orders in MySQL or $_SESSION['customer_orders'] must NEVER cause this to return true.
+ * - Returns true ONLY if $_SESSION['luxe_wedding'] exists, is NOT completed, and has at least one person with garments.
+ */
+function has_active_luxe_draft(): bool {
+    if (session_status() === PHP_SESSION_NONE) {
+        session_start();
+    }
+    $draft = $_SESSION['luxe_wedding'] ?? [];
+    if (empty($draft) || !is_array($draft)) {
+        return false;
+    }
+    if (is_luxe_order_completed($draft)) {
+        return false;
+    }
+    if (empty($draft['people']) || !is_array($draft['people'])) {
+        return false;
+    }
+    foreach ($draft['people'] as $p) {
+        if (!empty($p['garments']) && is_array($p['garments'])) {
+            return true;
+        }
+    }
+    return false;
+}
+
+/**
+ * Initialize or reset a clean, active Luxe order draft.
+ * 
+ * Strict Isolation Rules:
+ * - Completely decouples completed persisted orders from active session drafts.
+ * - Leaves user authentication ($_SESSION['user'], $_SESSION['user_id']) 100% intact.
+ * - Leaves Standard Stitching cart items ($_SESSION['demo_cart']) 100% intact for crossover flow.
+ * - Leaves saved customer orders ($_SESSION['customer_orders'] and DB) 100% intact.
+ * - Resets requested ready date, people, garments, order reference, and payment state to clean slate.
+ * 
+ * @param string $workflow 'wedding' or 'family'
+ * @param bool $force If true, forces reset even if an uncompleted draft exists
+ * @return array The fresh active Luxe draft
+ */
+function init_fresh_luxe_draft(string $workflow = 'wedding', bool $force = false): array {
+    if (session_status() === PHP_SESSION_NONE) {
+        session_start();
+    }
+
+    $existing = $_SESSION['luxe_wedding'] ?? [];
+
+    // If an in-progress draft is already active (unpaid and not submitted) and force is false,
+    // preserve the user's uncommitted draft progress but ensure valid workflow context.
+    if (!$force && !is_luxe_order_completed($existing) && !empty($existing) && is_array($existing)) {
+        if (in_array($workflow, ['wedding', 'family'], true)) {
+            $_SESSION['luxe_wedding']['workflow'] = $workflow;
+            $_SESSION['luxe_wedding']['occasion'] = ($workflow === 'family') ? 'Family & Celebrations' : 'Wedding';
+        }
+        return $_SESSION['luxe_wedding'];
+    }
+
+    // Clean reset for a brand new Luxe order draft
+    $cleanDraft = [
+        'workflow' => in_array($workflow, ['wedding', 'family'], true) ? $workflow : 'wedding',
+        'occasion' => ($workflow === 'family') ? 'Family & Celebrations' : 'Wedding',
+        'requested_ready_date' => '',
+        'wedding_date' => '',
+        'people_count' => null,
+        'people' => [],
+        'notes' => '',
+        'date_history' => [],
+        'advance_payment' => null,
+        'payment' => null,
+        'order_ref' => null,
+        'is_submitted' => false,
+        'created_at' => time()
+    ];
+
+    $_SESSION['luxe_wedding'] = $cleanDraft;
+    return $_SESSION['luxe_wedding'];
+}
+
+/**
+ * Check whether a Standard Stitching session payload represents an already completed/persisted order.
+ */
+function is_standard_order_completed(?array $draft = null): bool {
+    if (session_status() === PHP_SESSION_NONE) {
+        session_start();
+    }
+    if ($draft === null) {
+        $draft = $_SESSION['standard_order'] ?? [];
+    }
+    if (!is_array($draft) || empty($draft)) {
+        return false;
+    }
+    if (!empty($draft['payment']['status']) && $draft['payment']['status'] === 'completed') {
+        return true;
+    }
+    if (!empty($draft['is_submitted'])) {
+        return true;
+    }
+    if (!empty($draft['order_ref'])) {
+        return true;
+    }
+    return false;
+}
+
+/**
+ * Check whether the current session has an active, uncompleted Standard Stitching draft.
+ */
+function has_active_standard_draft(): bool {
+    if (session_status() === PHP_SESSION_NONE) {
+        session_start();
+    }
+    $draft = $_SESSION['standard_order'] ?? [];
+    if (empty($draft) || !is_array($draft)) {
+        return false;
+    }
+    if (is_standard_order_completed($draft)) {
+        return false;
+    }
+    return true;
+}
+
+/**
+ * Initialize or reset a clean, active Standard Stitching order draft.
+ */
+function init_fresh_standard_draft(bool $force = false): array {
+    if (session_status() === PHP_SESSION_NONE) {
+        session_start();
+    }
+
+    $existing = $_SESSION['standard_order'] ?? [];
+    if (!$force && !is_standard_order_completed($existing) && !empty($existing) && is_array($existing)) {
+        return $_SESSION['standard_order'];
+    }
+
+    $cleanDraft = [
+        'workflow' => 'standard',
+        'order_type' => 'Standard Stitching',
+        'measurement_method' => 'reference_blouse',
+        'requested_ready_date' => '',
+        'notes' => '',
+        'advance_payment' => null,
+        'payment' => null,
+        'order_ref' => null,
+        'is_submitted' => false,
+        'people' => [],
+        'created_at' => time()
+    ];
+
+    $_SESSION['standard_order'] = $cleanDraft;
+    return $_SESSION['standard_order'];
+}
+
 
 /**
  * Logout authenticated user.
@@ -1515,3 +1723,115 @@ function require_admin_login(?string $required_role = null): void {
         }
     }
 }
+
+/**
+ * Return customer sequence label (e.g. "New Customer", "2nd Time Customer", etc.).
+ */
+function get_customer_sequence_label(int $sequenceNumber): string {
+    if ($sequenceNumber <= 1) {
+        return 'New Customer';
+    }
+    if ($sequenceNumber === 2) {
+        return '2nd Time Customer';
+    }
+    if ($sequenceNumber === 3) {
+        return '3rd Time Customer';
+    }
+    return "{$sequenceNumber}th Time Customer";
+}
+
+/**
+ * Build a complete order-to-sequence map for all customers from permanent MySQL database.
+ * 
+ * Filters out invalid/cancelled orders, orders chronologically by booked_date, created_at, id.
+ * 
+ * @param PDO|null $pdo Optional PDO connection
+ * @return array ['by_order_id' => [order_id => seq], 'by_order_ref' => [order_ref => seq], 'by_user_id' => [user_id => total_orders]]
+ */
+function get_customer_order_sequence_map(?PDO $pdo = null): array {
+    if ($pdo === null && function_exists('get_db_connection')) {
+        try {
+            $pdo = get_db_connection();
+        } catch (\Throwable $e) {
+            return ['by_order_id' => [], 'by_order_ref' => [], 'by_user_id' => []];
+        }
+    }
+    if (!$pdo) {
+        return ['by_order_id' => [], 'by_order_ref' => [], 'by_user_id' => []];
+    }
+
+    try {
+        $stmt = $pdo->query("
+            SELECT id, user_id, order_ref, booked_date, created_at, status 
+            FROM orders 
+            WHERE status != 'cancelled' 
+            ORDER BY user_id ASC, booked_date ASC, created_at ASC, id ASC
+        ");
+        $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+        $byOrderId = [];
+        $byOrderRef = [];
+        $byUserId = [];
+        $userSequences = [];
+
+        foreach ($rows as $row) {
+            $uId = (int)$row['user_id'];
+            if (!isset($userSequences[$uId])) {
+                $userSequences[$uId] = 0;
+            }
+            $userSequences[$uId]++;
+            $seq = $userSequences[$uId];
+
+            $orderId = (int)$row['id'];
+            $orderRef = (string)$row['order_ref'];
+
+            $byOrderId[$orderId] = $seq;
+            if ($orderRef !== '') {
+                $byOrderRef[$orderRef] = $seq;
+            }
+            $byUserId[$uId] = $seq; // latest count for user
+        }
+
+        return [
+            'by_order_id' => $byOrderId,
+            'by_order_ref' => $byOrderRef,
+            'by_user_id' => $byUserId
+        ];
+    } catch (\Throwable $e) {
+        error_log('[Customer Sequence Map Error] ' . $e->getMessage());
+        return ['by_order_id' => [], 'by_order_ref' => [], 'by_user_id' => []];
+    }
+}
+
+// ============================================================================
+// 8. CSRF PROTECTION HELPERS
+// ============================================================================
+
+/**
+ * Generate or retrieve the active session CSRF token.
+ * Uses cryptographically secure random bytes (32 bytes -> 64 hex chars).
+ */
+function get_csrf_token(): string {
+    if (session_status() === PHP_SESSION_NONE) {
+        session_start();
+    }
+    if (empty($_SESSION['csrf_token']) || !is_string($_SESSION['csrf_token'])) {
+        $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
+    }
+    return $_SESSION['csrf_token'];
+}
+
+/**
+ * Verify an incoming CSRF token against the session token using constant-time comparison.
+ */
+function verify_csrf_token(?string $token): bool {
+    if (session_status() === PHP_SESSION_NONE) {
+        session_start();
+    }
+    if (empty($token) || empty($_SESSION['csrf_token']) || !is_string($_SESSION['csrf_token'])) {
+        return false;
+    }
+    return hash_equals($_SESSION['csrf_token'], trim($token));
+}
+
+

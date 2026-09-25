@@ -6,15 +6,18 @@ if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 
-if (!isset($_SESSION['luxe_wedding']) || !is_array($_SESSION['luxe_wedding'])) {
-    $_SESSION['luxe_wedding'] = [];
+// If the existing session contains an already paid/submitted order, or if new order is explicitly requested,
+// cleanly initialize a fresh draft for a new family & celebrations order without leaking previous order state.
+if (is_luxe_order_completed() || isset($_GET['new']) || isset($_GET['reset']) || empty($_SESSION['luxe_wedding'])) {
+    init_fresh_luxe_draft('family', isset($_GET['new']) || isset($_GET['reset']) || is_luxe_order_completed());
+} else {
+    $_SESSION['luxe_wedding']['workflow'] = 'family';
+    $_SESSION['luxe_wedding']['occasion'] = 'Family & Celebrations';
 }
 
-$_SESSION['luxe_wedding']['workflow'] = 'family';
-$_SESSION['luxe_wedding']['occasion'] = 'Family & Celebrations';
-
 $luxe = $_SESSION['luxe_wedding'];
-$isPaid = isset($luxe['payment']['status']) && $luxe['payment']['status'] === 'completed';
+// Defensive: In a genuine fresh draft $isPaid is false. If inspecting a confirmed order, lock stays enforced.
+$isPaid = is_luxe_order_completed($luxe);
 $currentRequestedDate = $luxe['requested_ready_date'] ?? ($luxe['wedding_date'] ?? '');
 
 include __DIR__ . '/includes/header.php';

@@ -66,7 +66,7 @@ include __DIR__ . '/includes/header.php';
             <p>Choose a blouse style and make it yours.</p>
             <div class="empty-order-actions">
                 <a class="demo-primary-action" href="blouse-styles.php">Choose a Blouse Style</a>
-                <a class="demo-secondary-action luxe-entry-btn" href="<?php echo htmlspecialchars($luxeEntryUrl); ?>">Explore Luxe Stitching →</a>
+                <a class="demo-secondary-link luxe-entry-btn" href="<?php echo htmlspecialchars($luxeEntryUrl); ?>">Explore Luxe Stitching →</a>
             </div>
             <p class="luxe-entry-note">Ordering for a wedding or family event? Design coordinated outfits with dedicated fitting references.</p>
         </section>
@@ -257,7 +257,7 @@ include __DIR__ . '/includes/header.php';
 
                 <a class="demo-secondary-link" href="blouse-styles.php">+ Add Another Blouse</a>
                 <div class="cart-luxe-cta-divider"></div>
-                <a class="demo-secondary-action luxe-entry-btn" href="<?php echo htmlspecialchars($luxeEntryUrl); ?>">Explore Luxe Stitching</a>
+                <a class="demo-secondary-link luxe-entry-btn" href="<?php echo htmlspecialchars($luxeEntryUrl); ?>">Explore Luxe Stitching</a>
                 <p class="luxe-entry-note">Want custom bridal/wedding wear with multiple garments and people? Explore Luxe Stitching (Multiple family members, intricate hand/machine embroidery, dedicated wedding workspace, and 30% advance booking).</p>
                 <?php if ($hasStandard): ?>
                     <a class="demo-clear-link" href="cart.php?clear=1" onclick="return confirm('Clear every garment from this demo order?');">Clear Order</a>

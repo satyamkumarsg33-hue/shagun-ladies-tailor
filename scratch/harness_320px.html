@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+  body { margin: 0; padding: 0; background: #222; }
+  iframe { border: none; width: 320px; height: 852px; display: block; }
+</style>
+</head>
+<body>
+<iframe id="frame" src="rendered_review_test.html"></iframe>
+<script>
+const frame = document.getElementById('frame');
+frame.onload = function() {
+    setTimeout(function() {
+        const doc = frame.contentDocument;
+        const win = frame.contentWindow;
+        
+        // Find all elements overflowing viewport
+        const overflowing = [];
+        doc.querySelectorAll('*').forEach(el => {
+            const r = el.getBoundingClientRect();
+            if (r.right > win.innerWidth + 1 || el.scrollWidth > win.innerWidth + 1) {
+                overflowing.push({
+                    tag: el.tagName,
+                    id: el.id,
+                    className: el.className,
+                    width: r.width,
+                    right: r.right,
+                    scrollWidth: el.scrollWidth
+                });
+            }
+        });
+
+        const report = {
+            viewportWidth: win.innerWidth,
+            viewportHeight: win.innerHeight,
+            scrollWidth: doc.documentElement.scrollWidth,
+            bodyScrollWidth: doc.body.scrollWidth,
+            hasHorizontalOverflow: doc.documentElement.scrollWidth > win.innerWidth || doc.body.scrollWidth > win.innerWidth,
+            overflowingCount: overflowing.length,
+            overflowingElements: overflowing.slice(0, 10),
+            sections: {}
+        };
+
+        const personCard = doc.querySelector('.luxe-review-person-card');
+        const summaryCard = doc.querySelector('.luxe-review-summary-card');
+        const garmentsSection = doc.querySelector('.luxe-review-garments-section');
+        const advanceCard = doc.querySelector('.luxe-review-advance-card');
+        const checkbox = doc.querySelector('#declaration-checkbox');
+        const payBtn = doc.querySelector('#confirm-pay-btn');
+
+        if (personCard) {
+            const r = personCard.getBoundingClientRect();
+            report.sections.personCard = { top: r.top, left: r.left, width: r.width, height: r.height };
+        }
+        if (summaryCard) {
+            const r = summaryCard.getBoundingClientRect();
+            report.sections.summaryCard = { top: r.top, left: r.left, width: r.width, height: r.height };
+        }
+        if (garmentsSection) {
+            const r = garmentsSection.getBoundingClientRect();
+            report.sections.garmentsSection = { top: r.top, left: r.left, width: r.width, height: r.height };
+        }
+        if (advanceCard) {
+            const r = advanceCard.getBoundingClientRect();
+            report.sections.advanceCard = { top: r.top, left: r.left, width: r.width, height: r.height };
+        }
+        if (checkbox) {
+            const r = checkbox.getBoundingClientRect();
+            report.sections.checkbox = { top: r.top, left: r.left, width: r.width, height: r.height };
+        }
+        if (payBtn) {
+            const r = payBtn.getBoundingClientRect();
+            report.sections.payBtn = { top: r.top, left: r.left, width: r.width, height: r.height };
+        }
+
+        const reportEl = document.createElement('div');
+        reportEl.id = 'iframe-audit-result';
+        reportEl.setAttribute('data-report', JSON.stringify(report));
+        reportEl.textContent = JSON.stringify(report);
+        document.body.appendChild(reportEl);
+    }, 200);
+};
+</script>
+</body>
+</html>

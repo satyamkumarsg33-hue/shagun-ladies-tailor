@@ -28,6 +28,16 @@ if (!isset($_SESSION['luxe_wedding']) || !is_array($_SESSION['luxe_wedding'])) {
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
+    // Defense-in-depth: If POSTing from Step 1 while session holds a completed order, initialize fresh draft
+    if (function_exists('is_luxe_order_completed') && is_luxe_order_completed($_SESSION['luxe_wedding'] ?? [])) {
+        $submittedWorkflow = (isset($_POST['workflow']) && in_array($_POST['workflow'], ['family', 'wedding'], true)) 
+            ? $_POST['workflow'] 
+            : 'wedding';
+        if (function_exists('init_fresh_luxe_draft')) {
+            init_fresh_luxe_draft($submittedWorkflow, true);
+        }
+    }
+
     /*
      * Workflow context (family vs wedding)
      */
@@ -39,7 +49,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     /*
      * Check payment status: date editing is strictly locked after payment is completed.
      */
-    $isPaid = isset($_SESSION['luxe_wedding']['payment']['status']) && $_SESSION['luxe_wedding']['payment']['status'] === 'completed';
+    $isPaid = function_exists('is_luxe_order_completed')
+        ? is_luxe_order_completed($_SESSION['luxe_wedding'] ?? [])
+        : (isset($_SESSION['luxe_wedding']['payment']['status']) && $_SESSION['luxe_wedding']['payment']['status'] === 'completed');
 
     /*
      * Step 1 sends the requested ready date.
@@ -252,6 +264,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
  * 2. READ PEOPLE FROM SESSION
  * ---------------------------------------------------------
  */
+
+// If accessing people.php via GET when the order is already completed, redirect to orders page
+if (function_exists('is_luxe_order_completed') && is_luxe_order_completed($_SESSION['luxe_wedding'] ?? [])) {
+    $completedRef = $_SESSION['luxe_wedding']['order_ref'] ?? ($_SESSION['luxe_wedding']['payment']['order_ref'] ?? '');
+    if (!empty($completedRef)) {
+        header('Location: orders.php?ref=' . urlencode($completedRef));
+    } else {
+        header('Location: luxe-stitching.php');
+    }
+    exit;
+}
 
 $people = $_SESSION['luxe_wedding']['people'] ?? [];
 

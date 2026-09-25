@@ -9,6 +9,7 @@ return [
     'app' => [
         'env' => app_env('APP_ENV', 'local'),
         'url' => rtrim((string) app_env('APP_URL', 'http://localhost/shagun-ladies-tailor'), '/'),
+        'share_token_lifetime_days' => (int) app_env('SHARE_TOKEN_LIFETIME_DAYS', '30'),
     ],
     'database' => [
         'host' => app_env('DB_HOST', '127.0.0.1'),

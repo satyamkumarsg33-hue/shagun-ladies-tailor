@@ -1,0 +1,340 @@
+<USER_REQUEST>
+We need to fix 3 bugs reported during real browser testing of the Shagun Ladies Tailor project.
+
+IMPORTANT:
+- Do NOT redesign unrelated parts.
+- Do NOT introduce fake/hardcoded customer, order, shop, payment, photo, or measurement data.
+- Use the existing database and existing order architecture.
+- Inspect the actual current implementation before modifying it.
+- Preserve all currently passing functionality and tests.
+- Do not change the canonical order lifecycle:
+  awaiting_confirmation
+  stitching_in_process
+  completed
+  delivered
+
+==================================================
+BUG 1 — EXPLORE LUXE STITCHING BUTTON PADDING
+==================================================
+
+The mobile screenshot shows the "Explore Luxe Stitching" button has different internal padding/height compared with the other two buttons in the same section.
+
+Requirement:
+
+- Inspect the actual HTML/PHP and CSS for all three buttons.
+- Identify the shared button component/class if one exists.
+- Make "Explore Luxe Stitching" use the SAME button sizing, padding, height, typography, border radius, alignment, and spacing as the other two buttons.
+- Do not solve this by adding an arbitrary one-off margin/padding unless the existing architecture requires it.
+- Prefer fixing the shared button class/component if the mismatch comes from a different class.
+- Verify mobile layout first.
+- Verify desktop/tablet layout is not broken.
+
+Acceptance:
+- All three buttons visually have matching padding/height.
+- Text remains centered.
+- No button becomes wider/taller unexpectedly.
+- No unrelated buttons are affected.
+
+==================================================
+BUG 2 — LUXE WORKFLOW IS SKIPPING MEASUREMENT LOGIC
+==================================================
+
+The reported problem:
+
+A customer enters the Luxe Stitching process and eventually reaches the next page/review/order stage, but the measurement requirement has effectively been skipped.
+
+IMPORTANT ARCHITECTURE DECISION:
+
+Measurement must NOT be determined globally by "Standard Stitching" vs "Luxe Stitching".
+
+Measurement/reference information belongs to EACH PHYSICAL GARMENT.
+
+For every garment in the order, the system must know how its fitting/measurement requirement will be handled.
+
+Current allowed customer-facing choices are:
+
+1. Reference Blouse
+2. Visit Shop
+
+The customer must NOT enter numerical measurements online.
+
+Required logic:
+
+A. REFERENCE BLOUSE
+
+If a garment has selected "Reference Blouse":
+
+- Treat its measurement requirement as satisfied.
+- Preserve the selected reference-blouse information through the complete order workflow.
+- Do not ask the customer for numerical measurements.
+- Do not ask for the same measurement choice again later.
+
+B. VISIT SHOP
+
+If a garment has selected "Visit Shop":
+
+- Treat the measurement method as valid.
+- Mark the garment as measurement pending / visit-shop required according to the existing architecture.
+- Do not force the customer to enter numerical measurements.
+- Preserve this state through cart, order creation, admin, and dossier.
+
+C. MISSING MEASUREMENT METHOD
+
+If a garment has neither:
+- Reference Blouse
+nor
+- Visit Shop
+
+then the workflow MUST NOT silently continue.
+
+Instead:
+- stop the workflow at the appropriate step,
+- clearly ask the customer to select how measurement will be handled,
+- allow them to continue only after one valid method is selected.
+
+D. EXISTING STANDARD STITCHING DATA
+
+If the same physical garment already has valid measurement/reference information collected during the Standard Stitching flow:
+
+- Reuse it.
+- Do NOT ask for it again.
+- Do NOT overwrite it with null/default data.
+
+If it does not have valid measurement information:
+
+- Require the measurement method before the garment can be finalized.
+
+E. MULTIPLE PEOPLE / MULTIPLE GARMENTS
+
+This must work independently for every garment.
+
+Example:
+
+Person: Riya
+
+Garment 1: Blouse
+Measurement: Reference Blouse
+Status: satisfied
+
+Garment 2: Saree
+Measurement: Visit Shop
+Status: measurement pending
+
+Garment 3: Lehenga
+Measurement: missing
+Status: cannot finalize until user chooses Reference Blouse or Visit Shop
+
+Do not create one global "measurement complete" flag for the entire order.
+
+F. WORKFLOW NAVIGATOR
+
+The existing smart workflow navigator must understand the measurement state of every garment.
+
+It must not simply say:
+
+"Standard = measurement skipped"
+
+or
+
+"Luxe = measurement required"
+
+Instead it should evaluate each garment's actual measurement/reference state.
+
+The customer should be prevented from reaching final review/order submission while any garment has a missing measurement method.
+
+IMPORTANT:
+Do not introduce numerical measurement entry fields.
+
+==================================================
+BUG 3 — INITIAL/INTAKE PHOTO IS MISSING FROM COMPLETION DOSSIER
+==================================================
+
+The screenshot shows that the admin uploaded the required initial garment photo when receiving the garment, and later uploaded completed garment photo(s).
+
+However, the generated dossier only shows the completed photo and does NOT show the initial/intake photo.
+
+This is incorrect.
+
+The dossier must preserve and display BOTH photo stages.
+
+Existing architecture already distinguishes:
+
+- awaiting_confirmation = intake/received stage
+- completed = completed garment stage
+
+Use the existing order gallery photo system and database records.
+
+DO NOT create a second unrelated photo storage system.
+
+==================================================
+PHOTO REQUIREMENTS
+==================================================
+
+For each order:
+
+INTAKE / RECEIVED GARMENT PHOTOS:
+- photos uploaded when admin receives the garment
+- maximum 3
+- stage = awaiting_confirmation
+
+COMPLETED GARMENT PHOTOS:
+- photos uploaded after completion
+- maximum 3
+- stage = completed
+
+The two stages must remain separate.
+
+Uploading a completed photo must NOT replace an intake photo.
+
+Uploading an intake photo must NOT replace a completed photo.
+
+==================================================
+COMPLETION DOSSIER
+==================================================
+
+Update the Completion Dossier generation so it includes the appropriate information from BOTH stages.
+
+The dossier should contain a clear section such as:
+
+"INTAKE / RECEIVED GARMENT PHOTOS"
+
+and:
+
+"COMPLETED GARMENT PHOTOS"
+
+Use the existing stored photos from the database.
+
+Do not hardcode image paths.
+
+Do not use the browser/local temporary image path.
+
+Use the existing secure server-side photo storage and retrieval mechanism.
+
+Preserve:
+- photo order
+- captions if already supported
+- stage information
+- existing security rules
+- existing file validation
+- maximum 3 photos per stage
+
+The dossier should continue to obey the existing completion-dossier security rules.
+
+IMPORTANT:
+The existing completion-dossier rule requiring at least one completed photo before generating the Completion Dossier must remain intact.
+
+That means:
+
+- intake photos alone are NOT sufficient to generate a Completion Dossier.
+- at least one completed photo is still required.
+- once the dossier is generated, it should include available intake photos AND completed photos.
+
+==================================================
+DATABASE / DATA INTEGRITY
+==================================================
+
+Before changing code:
+
+1. Inspect the actual schema.
+2. Inspect the existing order_gallery_photos implementation.
+3. Inspect how intake photos are uploaded.
+4. Inspect how completed photos are uploaded.
+5. Inspect includes/completion-dossier-pdf.php.
+6. Inspect includes/dossier-pdf.php.
+7. Inspect admin order/photo handling.
+8. Determine whether the existing stage field already contains:
+   awaiting_confirmation
+   completed
+
+Do not create duplicate tables if the current architecture already supports this.
+
+Do not migrate existing data unnecessarily.
+
+Do not modify existing customer/order/photo records just to make the screenshot pass.
+
+==================================================
+TESTING
+==================================================
+
+Add/update automated tests for all three bugs.
+
+BUG 1:
+- Verify the Explore Luxe Stitching button uses the intended shared styling/class.
+- Verify no duplicate/contradictory styling causes the mismatch.
+
+BUG 2:
+Test at minimum:
+
+1. Reference Blouse → allowed to continue.
+2. Visit Shop → allowed to continue.
+3. Missing measurement method → blocked.
+4. Existing Standard garment with valid reference data → reused.
+5. Existing Standard garment with Visit Shop → reused.
+6. Multiple garments with mixed measurement states.
+7. One garment missing measurement must block finalization.
+8. No numerical measurement fields are introduced.
+
+BUG 3:
+Test at minimum:
+
+1. Intake photo exists + completed photo exists → both appear in dossier data.
+2. Two intake photos + one completed photo → all three appear in correct sections.
+3. One intake photo + two completed photos → all three appear in correct sections.
+4. Intake photo does not appear in completed section.
+5. Completed photo does not appear in intake section.
+6. Intake photos alone cannot generate Completion Dossier.
+7. At least one completed photo still satisfies the dossier photo gate.
+8. Existing dossier security tests remain passing.
+
+==================================================
+BROWSER VERIFICATION
+==================================================
+
+After implementation, do real browser testing.
+
+Test:
+
+1. Open homepage on mobile viewport.
+2. Compare all three buttons and verify Explore Luxe Stitching padding matches.
+3. Enter a Luxe Stitching workflow.
+4. Add a garment.
+5. Verify measurement method cannot be silently skipped.
+6. Select Reference Blouse and verify workflow continues.
+7. Repeat with Visit Shop.
+8. Test a garment with no measurement method and verify it is blocked.
+9. Create/use a real test order.
+10. Admin receives garment.
+11. Upload an intake photo.
+12. Move order through the appropriate lifecycle.
+13. Upload a completed photo.
+14. Generate Completion Dossier.
+15. Open the PDF.
+16. Verify the intake photo appears under Intake / Received Garment Photos.
+17. Verify completed photo appears under Completed Garment Photos.
+18. Verify no photo is duplicated into the wrong section.
+19. Verify all existing customer/order/payment/measurement information remains present.
+
+Do NOT claim browser verification unless it was actually performed.
+
+==================================================
+FINAL REPORT
+==================================================
+
+Report:
+
+1. Exact files changed.
+2. Exact root cause of each bug.
+3. How measurement logic was implemented.
+4. How intake + completed photos are handled.
+5. Tests added/updated.
+6. Exact test results.
+7. Browser tests actually performed.
+8. Any remaining issue.
+
+Do not make unrelated improvements.
+Do not refactor unrelated modules.
+Do not alter the existing canonical order lifecycle.   
+</USER_REQUEST>
+<ADDITIONAL_METADATA>
+The current local time is: 2026-09-22T22:37:34+05:30.
+</ADDITIONAL_METADATA>

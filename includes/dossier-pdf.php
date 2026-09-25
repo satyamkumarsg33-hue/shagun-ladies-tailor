@@ -299,26 +299,94 @@ class ShagunPdfDocument {
     }
 
     /**
-     * Embed JPEG Image natively in PDF 1.4 stream
+     * Embed JPEG or PNG Image natively in PDF 1.4 stream
      */
     public function addImage($x, $y, $w, $h, $imagePath) {
         if (!file_exists($imagePath)) return false;
         $info = @getimagesize($imagePath);
-        if (!$info || ($info['mime'] !== 'image/jpeg' && $info['mime'] !== 'image/jpg')) {
+        if (!$info) return false;
+        $mime = $info['mime'] ?? '';
+        if ($mime !== 'image/jpeg' && $mime !== 'image/jpg' && $mime !== 'image/png') {
             return false;
         }
 
         $realPath = realpath($imagePath);
         if (!isset($this->images[$realPath])) {
             $imgKey = 'Im' . (count($this->images) + 1);
-            $data = file_get_contents($realPath);
-            $this->images[$realPath] = [
-                'key' => $imgKey,
-                'w' => $info[0],
-                'h' => $info[1],
-                'data' => $data,
-                'len' => strlen($data)
-            ];
+            if ($mime === 'image/jpeg' || $mime === 'image/jpg') {
+                $data = file_get_contents($realPath);
+                $this->images[$realPath] = [
+                    'key' => $imgKey,
+                    'w' => $info[0],
+                    'h' => $info[1],
+                    'data' => $data,
+                    'len' => strlen($data),
+                    'filter' => 'DCTDecode',
+                    'colorspace' => 'DeviceRGB',
+                    'bpc' => 8,
+                    'parms' => ''
+                ];
+            } elseif ($mime === 'image/png') {
+                $fh = fopen($realPath, 'rb');
+                fread($fh, 8); // Skip signature
+                $idat = '';
+                $colorType = 2;
+                $bpc = 8;
+                while (!feof($fh)) {
+                    $lenBytes = fread($fh, 4);
+                    if (strlen($lenBytes) < 4) break;
+                    $chunkLen = unpack('N', $lenBytes)[1];
+                    $type = fread($fh, 4);
+                    $data = $chunkLen > 0 ? fread($fh, $chunkLen) : '';
+                    fread($fh, 4); // CRC
+                    if ($type === 'IHDR') {
+                        $bpc = ord($data[8]);
+                        $colorType = ord($data[9]);
+                    } elseif ($type === 'IDAT') {
+                        $idat .= $data;
+                    }
+                }
+                fclose($fh);
+                if (empty($idat)) return false;
+
+                $colors = ($colorType === 2 || $colorType === 6) ? 3 : 1;
+                // If RGBA (colorType 6) or Grayscale+Alpha (colorType 4), uncompress scanlines and strip alpha
+                if ($colorType === 6 || $colorType === 4) {
+                    $raw = @gzuncompress($idat);
+                    if ($raw !== false) {
+                        $wPx = $info[0];
+                        $hPx = $info[1];
+                        $bytesPerPx = ($colorType === 6) ? 4 : 2;
+                        $keepBytes = ($colorType === 6) ? 3 : 1;
+                        $stride = 1 + ($wPx * $bytesPerPx);
+                        $newRaw = '';
+                        for ($line = 0; $line < $hPx; $line++) {
+                            $offset = $line * $stride;
+                            $filterByte = $raw[$offset] ?? "\0";
+                            $newRaw .= $filterByte;
+                            for ($px = 0; $px < $wPx; $px++) {
+                                $pxOffset = $offset + 1 + ($px * $bytesPerPx);
+                                for ($b = 0; $b < $keepBytes; $b++) {
+                                    $newRaw .= $raw[$pxOffset + $b] ?? "\0";
+                                }
+                            }
+                        }
+                        $idat = gzcompress($newRaw);
+                    }
+                }
+
+                $this->images[$realPath] = [
+                    'key' => $imgKey,
+                    'w' => $info[0],
+                    'h' => $info[1],
+                    'data' => $idat,
+                    'len' => strlen($idat),
+                    'filter' => 'FlateDecode',
+                    'colorspace' => ($colors === 3 ? 'DeviceRGB' : 'DeviceGray'),
+                    'bpc' => $bpc,
+                    'parms' => "/DecodeParms << /Predictor 15 /Columns {$info[0]} /Colors $colors /BitsPerComponent $bpc >> "
+                ];
+            }
         }
         $imgKey = $this->images[$realPath]['key'];
 
@@ -515,8 +583,13 @@ class ShagunPdfDocument {
             $h = $img['h'];
             $len = $img['len'];
             $data = $img['data'];
+            $filter = $img['filter'] ?? 'DCTDecode';
+            $cs = $img['colorspace'] ?? 'DeviceRGB';
+            $bpc = $img['bpc'] ?? 8;
+            $parms = $img['parms'] ?? '';
+
             $offsets[$imgId] = strlen($out);
-            $out .= "$imgId 0 obj\n<< /Type /XObject /Subtype /Image /Width $w /Height $h /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length $len >>\nstream\n" . $data . "\nendstream\nendobj\n";
+            $out .= "$imgId 0 obj\n<< /Type /XObject /Subtype /Image /Width $w /Height $h /ColorSpace /$cs /BitsPerComponent $bpc /Filter /$filter {$parms}/Length $len >>\nstream\n" . $data . "\nendstream\nendobj\n";
         }
 
         // Cross-Reference Table

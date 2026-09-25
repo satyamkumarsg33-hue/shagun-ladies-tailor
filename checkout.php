@@ -61,7 +61,7 @@ if ($requestedRef !== '') {
     }
 }
 
-if ($confirmedOrder === null && !empty($_SESSION['completed_standard_order'])) {
+if ($confirmedOrder === null && empty($cartItems) && !empty($_SESSION['completed_standard_order'])) {
     if (function_exists('is_standard_order_completed') && is_standard_order_completed($_SESSION['completed_standard_order'])) {
         $ordUserId = (int)($_SESSION['completed_standard_order']['user_id'] ?? 0);
         if ($ordUserId === 0 || $ordUserId === $userId) {
@@ -70,7 +70,7 @@ if ($confirmedOrder === null && !empty($_SESSION['completed_standard_order'])) {
     }
 }
 
-if ($confirmedOrder === null && !empty($_SESSION['standard_order'])) {
+if ($confirmedOrder === null && empty($cartItems) && !empty($_SESSION['standard_order'])) {
     if (function_exists('is_standard_order_completed') && is_standard_order_completed($_SESSION['standard_order'])) {
         $ordUserId = (int)($_SESSION['standard_order']['user_id'] ?? 0);
         if ($ordUserId === 0 || $ordUserId === $userId) {
@@ -79,7 +79,7 @@ if ($confirmedOrder === null && !empty($_SESSION['standard_order'])) {
     }
 }
 
-if ($confirmedOrder === null && !empty($_SESSION['last_completed_standard_order'])) {
+if ($confirmedOrder === null && empty($cartItems) && !empty($_SESSION['last_completed_standard_order'])) {
     if (function_exists('is_standard_order_completed') && is_standard_order_completed($_SESSION['last_completed_standard_order'])) {
         $ordUserId = (int)($_SESSION['last_completed_standard_order']['user_id'] ?? 0);
         if ($ordUserId === 0 || $ordUserId === $userId) {
@@ -91,10 +91,16 @@ if ($confirmedOrder === null && !empty($_SESSION['last_completed_standard_order'
 $hasCompletedOrder = ($confirmedOrder !== null);
 
 // If customer has active items in cart and the standard order in session is already completed from a prior checkout,
-// archive and reset standard_order so this new cart proceeds cleanly to measurement/review.
-if (!empty($cartItems) && !empty($_SESSION['standard_order']) && (function_exists('is_standard_order_completed') ? is_standard_order_completed($_SESSION['standard_order']) : false)) {
-    $_SESSION['last_completed_standard_order'] = $_SESSION['standard_order'];
-    $_SESSION['standard_order'] = [];
+// archive and reset both standard_order and completed_standard_order so this new cart proceeds cleanly.
+if (!empty($cartItems)) {
+    if (!empty($_SESSION['completed_standard_order'])) {
+        $_SESSION['last_completed_standard_order'] = $_SESSION['completed_standard_order'];
+        unset($_SESSION['completed_standard_order']);
+    }
+    if (!empty($_SESSION['standard_order']) && (function_exists('is_standard_order_completed') ? is_standard_order_completed($_SESSION['standard_order']) : false)) {
+        $_SESSION['last_completed_standard_order'] = $_SESSION['standard_order'];
+        $_SESSION['standard_order'] = [];
+    }
 }
 
 // Determine preliminary requested step
@@ -127,7 +133,15 @@ if (!empty($cartItems)) {
         $handWork = null;
         $workPrice = 0;
 
-        if (isset($choices['embroidery'])) {
+        if (!empty($item['machine_work'])) {
+            $workType = 'machine';
+            $machineWork = $item['machine_work'];
+            $workPrice = (int) ($item['machine_work']['price'] ?? 250);
+        } elseif (!empty($item['hand_work'])) {
+            $workType = 'hand';
+            $handWork = $item['hand_work'];
+            $workPrice = (int) ($item['hand_work']['price'] ?? 500);
+        } elseif (isset($choices['embroidery'])) {
             if ($choices['embroidery'] === 'machine') {
                 $workType = 'machine';
                 $workPrice = 250;
@@ -468,8 +482,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             exit;
         }
 
-        // Idempotency: If already completed in session
-        if (!empty($_SESSION['completed_standard_order']['payment']['status']) && $_SESSION['completed_standard_order']['payment']['status'] === 'completed') {
+        // Idempotency: If current active draft was already completed in session
+        if (!empty($_SESSION['standard_order']['payment']['status']) && $_SESSION['standard_order']['payment']['status'] === 'completed') {
+            $ref = $_SESSION['standard_order']['order_ref'] ?? '';
+            header('Location: checkout.php?step=confirmation&ref=' . urlencode($ref));
+            exit;
+        }
+
+        if (empty($cartItems) && !empty($_SESSION['completed_standard_order']['payment']['status']) && $_SESSION['completed_standard_order']['payment']['status'] === 'completed') {
             $ref = $_SESSION['completed_standard_order']['order_ref'] ?? '';
             header('Location: checkout.php?step=confirmation&ref=' . urlencode($ref));
             exit;
@@ -518,7 +538,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         ];
 
         // Idempotent save to customer orders store (database & session cache)
-        save_customer_completed_order($_SESSION['standard_order']);
+        $saved = save_customer_completed_order($_SESSION['standard_order']);
+
+        if (!$saved) {
+            $_SESSION['standard_order']['payment_error'] = 'Unable to save your order to the database. Please try again.';
+            header('Location: checkout.php?step=payment&error=persistence_failed');
+            exit;
+        }
 
         // Dedicated completed order record (decoupled from builder draft)
         $_SESSION['completed_standard_order'] = $_SESSION['standard_order'];
@@ -527,7 +553,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         // Clear active builder draft to prevent state leakage into future checkouts
         unset($_SESSION['standard_order']);
 
-        // Clear cart now that order is confirmed
+        // Clear cart ONLY after confirmed successful payment and persistence
         demo_cart_clear();
 
         header('Location: checkout.php?step=confirmation&ref=' . urlencode($orderRef));
